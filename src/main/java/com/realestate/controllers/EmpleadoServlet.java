@@ -110,15 +110,15 @@ public class EmpleadoServlet extends HttpServlet {
             nombreFoto
         );
 
-        boolean guardado = empleadoService.registrarEmpleado(empleado);
+        String errorMsg = empleadoService.registrarEmpleado(empleado);
 
         // 6. Responder con HTML de confirmación
-        if (guardado) {
+        if (errorMsg == null) {
             mostrarRespuesta(resp, true,
                 "Empleado registrado correctamente.", empleado, req.getContextPath());
         } else {
             mostrarRespuesta(resp, false,
-                "Error al registrar el empleado. Intenta nuevamente.", null, req.getContextPath());
+                "Error al registrar: " + errorMsg, null, req.getContextPath());
         }
     }
 
