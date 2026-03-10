@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "com.vgtech.mobile.app-merged_res-53:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.vgtech.mobile.app-main-55:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.vgtech.mobile.app-merged_res-53:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.vgtech.mobile.app-main-55:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "com.vgtech.mobile.app-merged_res-53:/drawable_vgtech_logo.png.flat",
+        "source": "com.vgtech.mobile.app-main-55:/drawable/vgtech_logo.png"
+    }
+]
