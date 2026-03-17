@@ -21,6 +21,23 @@ object InternalDb {
         val generatedUsers = mutableListOf<Employee>()
         val baseDate = System.currentTimeMillis()
 
+        // Admin account guaranteed for login
+        generatedUsers.add(
+            Employee(
+                uid = UUID.randomUUID().toString(),
+                nombreCompleto = "Admin RH User",
+                email = "admin@vgtech.com",
+                direccion = "Sede Principal",
+                telefono = "555-0000",
+                puesto = "RH",
+                sueldo = 80000.0,
+                diasVacaciones = 20,
+                password = "admin",
+                fechaRegistro = baseDate,
+                activo = true
+            )
+        )
+
         // 10 Empleados RH/Admin
         for (i in 0 until 10) {
             generatedUsers.add(

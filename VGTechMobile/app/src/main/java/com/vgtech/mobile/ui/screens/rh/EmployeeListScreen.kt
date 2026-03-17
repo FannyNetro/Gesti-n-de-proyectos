@@ -2,6 +2,7 @@ package com.vgtech.mobile.ui.screens.rh
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -163,36 +164,52 @@ fun EmployeeListScreen(
                 cats.toList().sorted()
             }
             
+            // Un panel contenedor con fondo gris que parece una "barra de tabs"
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 20.dp, vertical = 4.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(BackgroundLight)
+                    .padding(4.dp), // Espaciado interno de la barra
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 item {
-                    FilterChip(
-                        selected = selectedCategory == null,
-                        onClick = { selectedCategory = null },
-                        label = { Text("Todos") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Teal,
-                            selectedLabelColor = Color.White
+                    val isSelected = selectedCategory == null
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) Color.White else Color.Transparent)
+                            .clickable { selectedCategory = null }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "Todos",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Navy else TextMuted
                         )
-                    )
+                    }
                 }
                 items(allCategories) { cat ->
-                    FilterChip(
-                        selected = selectedCategory == cat,
-                        onClick = { selectedCategory = cat },
-                        label = { Text(cat) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Teal,
-                            selectedLabelColor = Color.White
+                    val isSelected = selectedCategory == cat
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) Color.White else Color.Transparent)
+                            .clickable { selectedCategory = cat }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = cat,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Navy else TextMuted
                         )
-                    )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         // ── Error ────────────────────────────────────────────────
