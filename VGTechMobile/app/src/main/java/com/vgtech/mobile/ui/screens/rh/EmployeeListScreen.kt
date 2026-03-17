@@ -104,54 +104,61 @@ fun EmployeeListScreen(
         }
 
         // ── Section title ────────────────────────────────────────
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 20.dp, vertical = 8.dp)
         ) {
-            Text(
-                "Empleados Registrados",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Navy,
-                modifier = Modifier.weight(1f)
-            )
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    color = Teal,
-                    strokeWidth = 2.dp
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Empleados Registrados",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Navy,
+                    modifier = Modifier.weight(1f)
                 )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = Teal,
+                        strokeWidth = 2.dp
+                    )
+                }
             }
+            
+            // Mustard accent bar moved under the title
+            Box(
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .width(40.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(Mustard)
+            )
         }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         // ── Search Bar ───────────────────────────────────────────
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Buscar por nombre o correo...") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+            placeholder = { Text("Buscar por nombre o correo...", color = TextMuted) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = TextMuted) },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            shape = RoundedCornerShape(12.dp),
+                .padding(horizontal = 20.dp, vertical = 4.dp),
+            shape = RoundedCornerShape(50),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = Teal,
-                unfocusedBorderColor = BorderColor
+                unfocusedBorderColor = Color.Transparent,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color(0xFFF1F5F9) // Slight light-gray for contrast
             )
         )
 
-        // Mustard accent bar
-        Box(
-            modifier = Modifier
-                .padding(start = 20.dp, top = 8.dp, bottom = 12.dp)
-                .width(36.dp)
-                .height(3.dp)
-                .clip(RoundedCornerShape(99.dp))
-                .background(Mustard)
-        )
+        Spacer(modifier = Modifier.height(12.dp))
 
         // ── Category Filters (Proveedores solo) ──────────────────
         if (filterRoles?.contains("Proveedor") == true) {
@@ -169,8 +176,8 @@ fun EmployeeListScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(BackgroundLight)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFE2E8F0)) // Un slate un poco más oscuro para que resalten las pestañas blancas
                     .padding(4.dp), // Espaciado interno de la barra
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -178,15 +185,15 @@ fun EmployeeListScreen(
                     val isSelected = selectedCategory == null
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(12.dp))
                             .background(if (isSelected) Color.White else Color.Transparent)
                             .clickable { selectedCategory = null }
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) {
                         Text(
                             text = "Todos",
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
                             color = if (isSelected) Navy else TextMuted
                         )
                     }
@@ -195,15 +202,15 @@ fun EmployeeListScreen(
                     val isSelected = selectedCategory == cat
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(12.dp))
                             .background(if (isSelected) Color.White else Color.Transparent)
                             .clickable { selectedCategory = cat }
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) {
                         Text(
                             text = cat,
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
                             color = if (isSelected) Navy else TextMuted
                         )
                     }
