@@ -149,8 +149,13 @@ private fun DrawerHeader() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Navy)
-            .padding(24.dp)
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(Navy, NavyLight)
+                )
+            )
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
             Icons.Default.AccountCircle,
@@ -161,8 +166,8 @@ private fun DrawerHeader() {
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             "VG Tech",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.ExtraBold,
             color = SurfaceWhite
         )
         Text(

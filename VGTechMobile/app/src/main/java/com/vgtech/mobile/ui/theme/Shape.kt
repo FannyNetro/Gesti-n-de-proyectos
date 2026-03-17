@@ -5,8 +5,8 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
 val VGTechShapes = Shapes(
-    small       = RoundedCornerShape(12.dp),
+    small       = RoundedCornerShape(16.dp),
     medium      = RoundedCornerShape(24.dp),   // Cards, dialogs
-    large       = RoundedCornerShape(28.dp),
-    extraLarge  = RoundedCornerShape(32.dp)
+    large       = RoundedCornerShape(32.dp),
+    extraLarge  = RoundedCornerShape(40.dp)
 )

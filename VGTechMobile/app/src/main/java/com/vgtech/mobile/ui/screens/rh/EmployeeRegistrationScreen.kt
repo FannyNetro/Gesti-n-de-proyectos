@@ -142,9 +142,9 @@ fun EmployeeRegistrationScreen(
         // ── Form Card ────────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(32.dp),
             colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 // Card header
@@ -524,7 +524,7 @@ private fun FormField(
 @Composable
 private fun formFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = Teal,
-    unfocusedBorderColor = BorderColor,
+    unfocusedBorderColor = Color.Transparent,
     focusedContainerColor = Color.White,
     unfocusedContainerColor = BackgroundLight
 )

@@ -356,17 +356,34 @@ private fun EmployeeCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            // Top row: name + role badge
+            // Top row: Avatar + name + role badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(TealLight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val initials = employee.nombreCompleto.split(" ").take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()
+                    Text(
+                        text = initials,
+                        color = TealDark,
+                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         employee.nombreCompleto,

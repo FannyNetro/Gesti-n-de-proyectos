@@ -67,7 +67,7 @@ fun LoginScreen(
                     colors = listOf(
                         Navy,
                         NavyMid,
-                        Color(0xFF0F2847)
+                        NavyLight
                     )
                 )
             ),
@@ -127,11 +127,11 @@ fun LoginScreen(
             // ── Login Card ───────────────────────────────────────
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(32.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = SurfaceWhite
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(28.dp),
@@ -224,7 +224,7 @@ fun LoginScreen(
                         ),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Teal,
-                            unfocusedBorderColor = BorderColor,
+                            unfocusedBorderColor = Color.Transparent,
                             focusedContainerColor = Color.White,
                             unfocusedContainerColor = BackgroundLight
                         )
@@ -294,7 +294,7 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .height(52.dp),
                         enabled = !isLoading,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Navy,
                             contentColor = Color.White

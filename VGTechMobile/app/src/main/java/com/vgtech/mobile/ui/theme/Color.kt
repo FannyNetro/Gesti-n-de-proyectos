@@ -3,26 +3,26 @@ package com.vgtech.mobile.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // ── Paleta VG Tech ──────────────────────────────────────────────
-val Navy           = Color(0xFF0A1C40)
-val NavyMid        = Color(0xFF162D52)
-val NavyLight      = Color(0xFF1A3464)
-val NavyItemHover  = Color(0xFF1F3E74)
+val Navy           = Color(0xFF0F172A) // Slate 900
+val NavyMid        = Color(0xFF1E293B) // Slate 800
+val NavyLight      = Color(0xFF334155) // Slate 700
+val NavyItemHover  = Color(0xFF475569) // Slate 600
 
-val Teal           = Color(0xFF21DBDD)
-val TealDark       = Color(0xFF1AB5B7)
-val TealLight      = Color(0xFFE0F7FA)
+val Teal           = Color(0xFF06B6D4) // Cyan 500
+val TealDark       = Color(0xFF0891B2) // Cyan 600
+val TealLight      = Color(0xFFCFFAFE) // Cyan 50
 
-val Mustard        = Color(0xFFF2D57D)
-val MustardDark    = Color(0xFFC9A84C)
+val Mustard        = Color(0xFFF59E0B) // Amber 500
+val MustardDark    = Color(0xFFD97706) // Amber 600
 
-val BackgroundLight = Color(0xFFF0F4F8)
+val BackgroundLight = Color(0xFFFAFAFA) // Cleaner light background
 val SurfaceWhite    = Color(0xFFFFFFFF)
 
-val TextPrimary    = Color(0xFF1A2B45)
-val TextMuted      = Color(0xFF6B7A94)
-val BorderColor    = Color(0xFFDBE1EA)
+val TextPrimary    = Color(0xFF0F172A)
+val TextMuted      = Color(0xFF64748B) // Slate 500
+val BorderColor    = Color(0xFFE2E8F0) // Slate 200
 
-val ErrorRed       = Color(0xFFB42318)
+val ErrorRed       = Color(0xFFEF4444) // Red 500
 val ErrorBg        = Color(0xFFFEF3F2)
 val SuccessGreen   = Color(0xFF12B76A)
 val WarningAmber   = Color(0xFFF79009)
