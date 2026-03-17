@@ -144,6 +144,20 @@ class EmployeeViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    // ── Reset Employee Password ──────────────────────────────────────
+
+    fun resetEmployeePassword(uid: String, newPassword: String) {
+        viewModelScope.launch {
+            try {
+                employeeRepository.resetPassword(uid, newPassword)
+                // Reload list to reflect any changes if needed, but not strictly required
+                // since Firestore snapshots handle remote state
+            } catch (e: Exception) {
+                _listError.value = e.localizedMessage ?: "Error al restablecer contraseña"
+            }
+        }
+    }
+
     // ── Reset Registration State ─────────────────────────────────────
 
     fun resetRegistration() {

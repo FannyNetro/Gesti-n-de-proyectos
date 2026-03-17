@@ -206,7 +206,8 @@ fun EmployeeListScreen(
                             EmployeeCard(
                                 employee = employee,
                                 onDeactivate = { motivo -> employeeViewModel.deactivateEmployee(employee.uid, motivo) },
-                                onEdit = { updatedEmp -> employeeViewModel.updateEmployee(updatedEmp) }
+                                onEdit = { updatedEmp -> employeeViewModel.updateEmployee(updatedEmp) },
+                                onResetPassword = { uid, newPass -> employeeViewModel.resetEmployeePassword(uid, newPass) }
                             )
                         }
                     }
@@ -216,7 +217,8 @@ fun EmployeeListScreen(
                         EmployeeCard(
                             employee = employee,
                             onDeactivate = { motivo -> employeeViewModel.deactivateEmployee(employee.uid, motivo) },
-                            onEdit = { updatedEmp -> employeeViewModel.updateEmployee(updatedEmp) }
+                            onEdit = { updatedEmp -> employeeViewModel.updateEmployee(updatedEmp) },
+                            onResetPassword = { uid, newPass -> employeeViewModel.resetEmployeePassword(uid, newPass) }
                         )
                     }
                 }
@@ -276,10 +278,13 @@ private fun StatCard(
 private fun EmployeeCard(
     employee: Employee,
     onDeactivate: (String) -> Unit,
-    onEdit: (Employee) -> Unit
+    onEdit: (Employee) -> Unit,
+    onResetPassword: (String, String) -> Unit
 ) {
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var showConfirmResetDialog by remember { mutableStateOf(false) }
+    var newGeneratedPassword by remember { mutableStateOf<String?>(null) }
 
     Card(
         modifier = Modifier
@@ -355,6 +360,19 @@ private fun EmployeeCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(
+                    onClick = { showConfirmResetDialog = true },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MustardDark)
+                ) {
+                    Icon(
+                        Icons.Default.VpnKey,
+                        contentDescription = "Restablecer contraseña",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Clave", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+
+                TextButton(
                     onClick = { showEditDialog = true },
                     colors = ButtonDefaults.textButtonColors(contentColor = Teal)
                 ) {
@@ -378,7 +396,7 @@ private fun EmployeeCard(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Despedir", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("Baja", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
                 }
             }
@@ -419,6 +437,70 @@ private fun EmployeeCard(
             dismissButton = {
                 TextButton(onClick = { showConfirmDialog = false }) {
                     Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Confirm password reset dialog
+    if (showConfirmResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmResetDialog = false },
+            icon = { Text("🔑", fontSize = 28.sp) },
+            title = { Text("Restablecer Contraseña") },
+            text = { Text("¿Deseas generar una nueva contraseña para ${employee.nombreCompleto}? La antigua dejará de funcionar.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val chars = ('A'..'Z') + ('a'..'z') + ('0'..'9')
+                        val newPass = (1..8).map { chars.random() }.joinToString("")
+                        onResetPassword(employee.uid, newPass)
+                        newGeneratedPassword = newPass
+                        showConfirmResetDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Navy)
+                ) {
+                    Text("Sí, Generar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmResetDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    // Show generated password dialog
+    if (newGeneratedPassword != null) {
+        AlertDialog(
+            onDismissRequest = { newGeneratedPassword = null },
+            icon = { Text("✅", fontSize = 28.sp) },
+            title = { Text("Contraseña Actualizada") },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text("La nueva contraseña provisional es:")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Surface(
+                        color = Navy.copy(alpha = 0.05f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Text(
+                            text = newGeneratedPassword!!,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 24.sp,
+                            color = Navy,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Por favor compártela de forma segura con el empleado.", color = TextMuted, fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                Button(onClick = { newGeneratedPassword = null }) {
+                    Text("Entendido")
                 }
             }
         )

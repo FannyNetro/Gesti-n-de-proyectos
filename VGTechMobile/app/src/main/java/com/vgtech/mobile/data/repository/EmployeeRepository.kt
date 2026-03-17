@@ -34,16 +34,20 @@ class EmployeeRepository {
         InternalDb.updateEmployee(employee)
     }
 
-    // ── Soft-delete (deactivate) ─────────────────────────────────────
-
-    /**
-     * "Despedir" — marks the employee as inactive instead of hard-deleting.
-     */
+    // ── Deactivate Employee ──────────────────────────────────────────
     suspend fun deactivateEmployee(uid: String, motivo: String) {
-        val emp = InternalDb.getEmployeeById(uid)
-        if (emp != null) {
-            InternalDb.updateEmployee(emp.copy(activo = false, motivoInactivo = motivo))
-        }
+        // En mem (Mock):
+        InternalDb.deactivateEmployee(uid, motivo)
+        // En Firestore (Futuro):
+        // employeeCollection.document(uid).update(mapOf("activo" to false, "motivoInactivo" to motivo)).await()
+    }
+
+    // ── Reset Employee Password ──────────────────────────────────────
+    suspend fun resetPassword(uid: String, newPassword: String) {
+        // En mem (Mock):
+        InternalDb.updateEmployeePassword(uid, newPassword)
+        // En Firebase Auth / Firestore (Futuro):
+        // Se requeriría usar Firebase Admin SDK o functions si se desea cambiar la contraseña de otro usuario.
     }
 
     // ── Get employee count ───────────────────────────────────────────
