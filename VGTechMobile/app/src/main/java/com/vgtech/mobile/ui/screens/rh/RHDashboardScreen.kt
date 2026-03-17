@@ -33,6 +33,7 @@ fun RHDashboardScreen(
 
     val drawerItems = listOf(
         DrawerItem("empleados", "Empleados", Icons.Filled.Group, Icons.Outlined.Group),
+        DrawerItem("supervisores", "Supervisores", Icons.Filled.Engineering, Icons.Outlined.Engineering),
         DrawerItem("proveedores", "Proveedores", Icons.Filled.Handshake, Icons.Outlined.Handshake),
         DrawerItem("consultores", "Consultores", Icons.Filled.BusinessCenter, Icons.Outlined.BusinessCenter),
         DrawerItem("registrar", "Registrar", Icons.Filled.PersonAdd, Icons.Outlined.PersonAdd),
@@ -122,7 +123,8 @@ fun RHDashboardScreen(
         ) { paddingValues ->
             Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
                 when (selectedDrawerRoute) {
-                    "empleados" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("RH", "Administrativo", "Supervisor", "Empleado"))
+                    "empleados" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("RH", "Administrativo", "Empleado"))
+                    "supervisores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Supervisor"))
                     "proveedores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Proveedor"))
                     "consultores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Consultor"))
                     "registrar" -> EmployeeRegistrationScreen(employeeViewModel = employeeViewModel)

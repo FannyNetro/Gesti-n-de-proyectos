@@ -33,14 +33,41 @@ fun EmployeeListScreen(
     filterRoles: List<String>? = null
 ) {
     val allEmployees by employeeViewModel.employees.collectAsState()
+    var searchQuery by remember { mutableStateOf("") }
     
-    val employees = remember(allEmployees, filterRoles) {
-        if (filterRoles == null) {
+    val employees = remember(allEmployees, filterRoles, searchQuery) {
+        val filteredByRole = if (filterRoles == null) {
             allEmployees
         } else {
             allEmployees.filter { it.puesto in filterRoles }
         }
+        
+        if (searchQuery.isBlank()) {
+            filteredByRole
+        } else {
+            filteredByRole.filter { 
+                it.nombreCompleto.contains(searchQuery, ignoreCase = true) || 
+                it.email.contains(searchQuery, ignoreCase = true) 
+            }
+        }
     }
+    
+    val groupedProviders = remember(employees, filterRoles) {
+        if (filterRoles?.contains("Proveedor") == true) {
+            val map = mutableMapOf<String, MutableList<Employee>>()
+            employees.forEach { emp ->
+                if (emp.tipoTrabajo.isEmpty()) {
+                    map.getOrPut("General", { mutableListOf() }).add(emp)
+                } else {
+                    emp.tipoTrabajo.forEach { cat ->
+                        map.getOrPut(cat, { mutableListOf() }).add(emp)
+                    }
+                }
+            }
+            map
+        } else null
+    }
+
     val isLoading by employeeViewModel.isLoading.collectAsState()
     val error by employeeViewModel.listError.collectAsState()
 
@@ -91,6 +118,23 @@ fun EmployeeListScreen(
                 )
             }
         }
+
+        // ── Search Bar ───────────────────────────────────────────
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Buscar por nombre o correo...") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Teal,
+                unfocusedBorderColor = BorderColor
+            )
+        )
 
         // Mustard accent bar
         Box(
@@ -146,14 +190,38 @@ fun EmployeeListScreen(
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(employees, key = { it.uid }) { employee ->
-                    EmployeeCard(
-                        employee = employee,
-                        onDeactivate = { motivo -> employeeViewModel.deactivateEmployee(employee.uid, motivo) },
-                        onEdit = { updatedEmp -> employeeViewModel.updateEmployee(updatedEmp) }
-                    )
+                // If filtering by Proveedor, group by category
+                if (groupedProviders != null) {
+                    groupedProviders.forEach { (category, providers) ->
+                        item(key = "header_$category") {
+                            Text(
+                                "Categoria: $category",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Navy,
+                                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                            )
+                        }
+                        items(providers, key = { it.uid + "_$category" }) { employee ->
+                            EmployeeCard(
+                                employee = employee,
+                                onDeactivate = { motivo -> employeeViewModel.deactivateEmployee(employee.uid, motivo) },
+                                onEdit = { updatedEmp -> employeeViewModel.updateEmployee(updatedEmp) }
+                            )
+                        }
+                    }
+                } else {
+                    // Normal un-grouped list
+                    items(employees, key = { it.uid }) { employee ->
+                        EmployeeCard(
+                            employee = employee,
+                            onDeactivate = { motivo -> employeeViewModel.deactivateEmployee(employee.uid, motivo) },
+                            onEdit = { updatedEmp -> employeeViewModel.updateEmployee(updatedEmp) }
+                        )
+                    }
                 }
-                // Bottom spacer for BottomNav
+                
+                // Bottom spacer for BottomNav/Drawer
                 item { Spacer(modifier = Modifier.height(16.dp)) }
             }
         }
@@ -210,7 +278,6 @@ private fun EmployeeCard(
     onDeactivate: (String) -> Unit,
     onEdit: (Employee) -> Unit
 ) {
-    var showPassword by remember { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
 
@@ -276,37 +343,6 @@ private fun EmployeeCard(
                     Text("Estado: ", style = MaterialTheme.typography.bodySmall, color = TextMuted)
                     Text("Inactivo (${employee.motivoInactivo.ifEmpty { "Sin motivo" }})", 
                          style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = ErrorRed)
-                }
-            }
-
-            // Password row with toggle
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("🔑", fontSize = 13.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "Contraseña: ",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMuted
-                )
-                Text(
-                    if (showPassword) employee.password else "••••••••",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (showPassword) Navy else TextMuted
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                IconButton(
-                    onClick = { showPassword = !showPassword },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        if (showPassword) Icons.Default.VisibilityOff
-                        else Icons.Default.Visibility,
-                        contentDescription = "Toggle password",
-                        modifier = Modifier.size(16.dp),
-                        tint = TextMuted
-                    )
                 }
             }
 
