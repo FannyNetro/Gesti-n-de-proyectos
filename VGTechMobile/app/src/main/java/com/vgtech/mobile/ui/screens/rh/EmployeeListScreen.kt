@@ -4,6 +4,8 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,9 +29,18 @@ import com.vgtech.mobile.ui.viewmodel.EmployeeViewModel
  */
 @Composable
 fun EmployeeListScreen(
-    employeeViewModel: EmployeeViewModel
+    employeeViewModel: EmployeeViewModel,
+    filterRoles: List<String>? = null
 ) {
-    val employees by employeeViewModel.employees.collectAsState()
+    val allEmployees by employeeViewModel.employees.collectAsState()
+    
+    val employees = remember(allEmployees, filterRoles) {
+        if (filterRoles == null) {
+            allEmployees
+        } else {
+            allEmployees.filter { it.puesto in filterRoles }
+        }
+    }
     val isLoading by employeeViewModel.isLoading.collectAsState()
     val error by employeeViewModel.listError.collectAsState()
 
@@ -138,7 +149,8 @@ fun EmployeeListScreen(
                 items(employees, key = { it.uid }) { employee ->
                     EmployeeCard(
                         employee = employee,
-                        onDeactivate = { employeeViewModel.deactivateEmployee(employee.uid) }
+                        onDeactivate = { motivo -> employeeViewModel.deactivateEmployee(employee.uid, motivo) },
+                        onEdit = { updatedEmp -> employeeViewModel.updateEmployee(updatedEmp) }
                     )
                 }
                 // Bottom spacer for BottomNav
@@ -195,10 +207,12 @@ private fun StatCard(
 @Composable
 private fun EmployeeCard(
     employee: Employee,
-    onDeactivate: () -> Unit
+    onDeactivate: (String) -> Unit,
+    onEdit: (Employee) -> Unit
 ) {
     var showPassword by remember { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
@@ -244,6 +258,27 @@ private fun EmployeeCard(
             Spacer(modifier = Modifier.height(6.dp))
             InfoRow("🏖️", "Vacaciones", "${employee.diasVacaciones} días")
 
+            if (employee.puesto.lowercase() == "proveedor" && employee.tipoTrabajo.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                InfoRow("🛠️", "Tipos de Trabajo", employee.tipoTrabajo.joinToString(", "))
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (employee.activo) {
+                    Text("✅", fontSize = 13.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Estado: ", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                    Text("Activo", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = SuccessGreen)
+                } else {
+                    Text("⛔", fontSize = 13.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Estado: ", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                    Text("Inactivo (${employee.motivoInactivo.ifEmpty { "Sin motivo" }})", 
+                         style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = ErrorRed)
+                }
+            }
+
             // Password row with toggle
             Spacer(modifier = Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -284,16 +319,31 @@ private fun EmployeeCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(
-                    onClick = { showConfirmDialog = true },
-                    colors = ButtonDefaults.textButtonColors(contentColor = ErrorRed)
+                    onClick = { showEditDialog = true },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Teal)
                 ) {
                     Icon(
-                        Icons.Default.PersonRemove,
+                        Icons.Default.Edit,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Despedir", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text("Editar", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+                
+                if (employee.activo) {
+                    TextButton(
+                        onClick = { showConfirmDialog = true },
+                        colors = ButtonDefaults.textButtonColors(contentColor = ErrorRed)
+                    ) {
+                        Icon(
+                            Icons.Default.PersonRemove,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Despedir", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    }
                 }
             }
         }
@@ -301,18 +351,28 @@ private fun EmployeeCard(
 
     // Confirm deactivation dialog
     if (showConfirmDialog) {
+        var motivo by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
             icon = { Text("⚠️", fontSize = 28.sp) },
             title = { Text("¿Despedir Empleado?") },
             text = {
-                Text("¿Estás seguro de querer despedir a ${employee.nombreCompleto}? " +
-                        "Esta acción desactivará su cuenta.")
+                Column {
+                    Text("¿Estás seguro de querer despedir a ${employee.nombreCompleto}? " +
+                            "Esta acción desactivará su cuenta.")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = motivo,
+                        onValueChange = { motivo = it },
+                        label = { Text("Motivo del despido / inactividad") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        onDeactivate()
+                        onDeactivate(motivo)
                         showConfirmDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
@@ -327,6 +387,77 @@ private fun EmployeeCard(
             }
         )
     }
+
+    if (showEditDialog) {
+        EmployeeEditDialog(
+            employee = employee,
+            onDismiss = { showEditDialog = false },
+            onSave = { updated ->
+                onEdit(updated)
+                showEditDialog = false
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EmployeeEditDialog(
+    employee: Employee,
+    onDismiss: () -> Unit,
+    onSave: (Employee) -> Unit
+) {
+    var nombreCompleto by remember { mutableStateOf(employee.nombreCompleto) }
+    var telefono by remember { mutableStateOf(employee.telefono) }
+    var direccion by remember { mutableStateOf(employee.direccion) }
+    var sueldo by remember { mutableStateOf(employee.sueldo.toString()) }
+    var activo by remember { mutableStateOf(employee.activo) }
+    var motivoInactivo by remember { mutableStateOf(employee.motivoInactivo) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Empleado") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())) {
+                OutlinedTextField(value = nombreCompleto, onValueChange = { nombreCompleto = it }, label = { Text("Nombre Completo") }, modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = telefono, onValueChange = { telefono = it }, label = { Text("Teléfono") }, modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = direccion, onValueChange = { direccion = it }, label = { Text("Dirección") }, modifier = Modifier.fillMaxWidth())
+                
+                if (employee.puesto.lowercase() != "proveedor") {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(value = sueldo, onValueChange = { sueldo = it }, label = { Text("Sueldo") }, modifier = Modifier.fillMaxWidth())
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = activo, onCheckedChange = { activo = it })
+                    Text("Empleado Activo", style = MaterialTheme.typography.bodyMedium)
+                }
+                
+                if (!activo) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(value = motivoInactivo, onValueChange = { motivoInactivo = it }, label = { Text("Motivo de inactividad") }, modifier = Modifier.fillMaxWidth())
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                onSave(employee.copy(
+                    nombreCompleto = nombreCompleto.trim(),
+                    telefono = telefono.trim(),
+                    direccion = direccion.trim(),
+                    sueldo = sueldo.toDoubleOrNull() ?: employee.sueldo,
+                    activo = activo,
+                    motivoInactivo = if (!activo) motivoInactivo else ""
+                ))
+            }) { Text("Guardar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
 }
 
 @Composable

@@ -48,7 +48,10 @@ fun EmployeeRegistrationScreen(
     var diasVacaciones by remember { mutableStateOf("") }
 
     var puestoExpanded by remember { mutableStateOf(false) }
-    val puestos = listOf("Consultor", "Supervisor", "Administrativo", "RH")
+    val puestos = listOf("Consultor", "Supervisor", "Administrativo", "RH", "Proveedor")
+
+    var tipoTrabajo by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val tiposTrabajoOptions = listOf("Mantenimiento", "Limpieza", "Seguridad", "Electricidad", "Plomería", "Alimentos")
 
     val isLoading = registrationState is RegistrationState.Loading
     val errorMessage = (registrationState as? RegistrationState.Error)?.message
@@ -65,6 +68,7 @@ fun EmployeeRegistrationScreen(
             puesto = ""
             sueldo = ""
             diasVacaciones = ""
+            tipoTrabajo = emptySet()
         }
     }
 
@@ -314,50 +318,79 @@ fun EmployeeRegistrationScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // ── Financial fields row ─────────────────────
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Sueldo
-                    OutlinedTextField(
-                        value = sueldo,
-                        onValueChange = { sueldo = it },
-                        label = { Text("SUELDO (MXN)", style = MaterialTheme.typography.labelSmall) },
-                        placeholder = { Text("25000") },
-                        leadingIcon = {
-                            Text(
-                                "$",
-                                modifier = Modifier.padding(start = 12.dp),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TextMuted
-                            )
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        enabled = !isLoading,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        colors = formFieldColors()
-                    )
-
-                    // Vacaciones
-                    OutlinedTextField(
-                        value = diasVacaciones,
-                        onValueChange = { diasVacaciones = it },
-                        label = { Text("VACACIONES", style = MaterialTheme.typography.labelSmall) },
-                        placeholder = { Text("Días") },
-                        leadingIcon = {
-                            Icon(Icons.Default.BeachAccess, null, tint = TextMuted)
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        enabled = !isLoading,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        colors = formFieldColors()
-                    )
+                // ── Financial fields or Tipo Trabajo ─────────────────────
+                if (puesto.lowercase() != "proveedor") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Sueldo
+                        OutlinedTextField(
+                            value = sueldo,
+                            onValueChange = { sueldo = it },
+                            label = { Text("SUELDO (MXN)", style = MaterialTheme.typography.labelSmall) },
+                            placeholder = { Text("25000") },
+                            leadingIcon = {
+                                Text(
+                                    "$",
+                                    modifier = Modifier.padding(start = 12.dp),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextMuted
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true,
+                            enabled = !isLoading,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = formFieldColors()
+                        )
+    
+                        // Vacaciones
+                        OutlinedTextField(
+                            value = diasVacaciones,
+                            onValueChange = { diasVacaciones = it },
+                            label = { Text("VACACIONES", style = MaterialTheme.typography.labelSmall) },
+                            placeholder = { Text("Días") },
+                            leadingIcon = {
+                                Icon(Icons.Default.BeachAccess, null, tint = TextMuted)
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true,
+                            enabled = !isLoading,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = formFieldColors()
+                        )
+                    }
+                } else {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = BackgroundLight),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("TIPO DE TRABAJO (Selecciona uno o más)", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            tiposTrabajoOptions.forEach { option ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                                ) {
+                                    Checkbox(
+                                        checked = tipoTrabajo.contains(option),
+                                        onCheckedChange = { checked -> 
+                                            if (checked) tipoTrabajo = tipoTrabajo + option
+                                            else tipoTrabajo = tipoTrabajo - option
+                                        },
+                                        colors = CheckboxDefaults.colors(checkedColor = Teal)
+                                    )
+                                    Text(option, style = MaterialTheme.typography.bodyMedium, color = Navy)
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -380,7 +413,8 @@ fun EmployeeRegistrationScreen(
                                 telefono        = telefono.trim(),
                                 puesto          = puesto,
                                 sueldo          = sueldo.toDoubleOrNull() ?: 0.0,
-                                diasVacaciones  = diasVacaciones.toIntOrNull() ?: 0
+                                diasVacaciones  = diasVacaciones.toIntOrNull() ?: 0,
+                                tipoTrabajo     = tipoTrabajo.toList()
                             )
                             employeeViewModel.registerEmployee(employee)
                         },
@@ -419,6 +453,7 @@ fun EmployeeRegistrationScreen(
                             puesto = ""
                             sueldo = ""
                             diasVacaciones = ""
+                            tipoTrabajo = emptySet()
                             employeeViewModel.resetRegistration()
                         },
                         modifier = Modifier.height(50.dp),

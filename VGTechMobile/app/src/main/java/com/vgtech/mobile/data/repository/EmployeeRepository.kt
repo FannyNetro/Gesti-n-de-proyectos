@@ -18,7 +18,7 @@ class EmployeeRepository {
      */
     fun getEmployees(): Flow<List<Employee>> {
         return InternalDb.employees.map { list ->
-            list.filter { it.activo }.sortedByDescending { it.fechaRegistro }
+            list.sortedByDescending { it.fechaRegistro }
         }
     }
 
@@ -39,10 +39,10 @@ class EmployeeRepository {
     /**
      * "Despedir" — marks the employee as inactive instead of hard-deleting.
      */
-    suspend fun deactivateEmployee(uid: String) {
+    suspend fun deactivateEmployee(uid: String, motivo: String) {
         val emp = InternalDb.getEmployeeById(uid)
         if (emp != null) {
-            InternalDb.updateEmployee(emp.copy(activo = false))
+            InternalDb.updateEmployee(emp.copy(activo = false, motivoInactivo = motivo))
         }
     }
 

@@ -16,7 +16,9 @@ data class Employee(
     val diasVacaciones: Int      = 0,
     val password: String         = "",      // Stored for admin visibility (as per spec)
     val fechaRegistro: Long      = System.currentTimeMillis(),
-    val activo: Boolean          = true
+    val activo: Boolean          = true,
+    val tipoTrabajo: List<String> = emptyList(), // For Proveedor category tags
+    val motivoInactivo: String   = ""
 ) {
     /** Map roles to navigation destinations */
     fun toRole(): UserRole = when (puesto.lowercase()) {
@@ -40,7 +42,9 @@ data class Employee(
         "diasVacaciones"   to diasVacaciones,
         "password"         to password,
         "fechaRegistro"    to fechaRegistro,
-        "activo"           to activo
+        "activo"           to activo,
+        "tipoTrabajo"      to tipoTrabajo,
+        "motivoInactivo"   to motivoInactivo
     )
 }
 

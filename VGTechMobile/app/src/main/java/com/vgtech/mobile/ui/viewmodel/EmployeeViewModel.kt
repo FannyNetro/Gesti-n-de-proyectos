@@ -90,8 +90,17 @@ class EmployeeViewModel(application: Application) : AndroidViewModel(application
             _registrationState.value = RegistrationState.Error("Selecciona un puesto")
             return
         }
-        if (employee.sueldo <= 0) {
-            _registrationState.value = RegistrationState.Error("El sueldo debe ser mayor a 0")
+        
+        // Proveedores don't strictly need sueldo/vacaciones
+        if (employee.puesto.lowercase() != "proveedor") {
+            if (employee.sueldo <= 0) {
+                _registrationState.value = RegistrationState.Error("El sueldo debe ser mayor a 0")
+                return
+            }
+        }
+        
+        if (employee.puesto.lowercase() == "proveedor" && employee.tipoTrabajo.isEmpty()) {
+            _registrationState.value = RegistrationState.Error("Selecciona al menos un tipo de trabajo para el proveedor")
             return
         }
 
@@ -125,10 +134,10 @@ class EmployeeViewModel(application: Application) : AndroidViewModel(application
 
     // ── Deactivate (Fire) Employee ───────────────────────────────────
 
-    fun deactivateEmployee(uid: String) {
+    fun deactivateEmployee(uid: String, motivo: String) {
         viewModelScope.launch {
             try {
-                employeeRepository.deactivateEmployee(uid)
+                employeeRepository.deactivateEmployee(uid, motivo)
             } catch (e: Exception) {
                 _listError.value = e.localizedMessage ?: "Error al despedir empleado"
             }
