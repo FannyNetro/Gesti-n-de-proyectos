@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -34,22 +35,27 @@ fun EmployeeListScreen(
 ) {
     val allEmployees by employeeViewModel.employees.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
     
-    val employees = remember(allEmployees, filterRoles, searchQuery) {
-        val filteredByRole = if (filterRoles == null) {
+    val employees = remember(allEmployees, filterRoles, searchQuery, selectedCategory) {
+        var filtered = if (filterRoles == null) {
             allEmployees
         } else {
             allEmployees.filter { it.puesto in filterRoles }
         }
         
-        if (searchQuery.isBlank()) {
-            filteredByRole
-        } else {
-            filteredByRole.filter { 
+        if (selectedCategory != null) {
+            filtered = filtered.filter { it.tipoTrabajo.contains(selectedCategory) || (selectedCategory == "General" && it.tipoTrabajo.isEmpty()) }
+        }
+        
+        if (searchQuery.isNotBlank()) {
+            filtered = filtered.filter { 
                 it.nombreCompleto.contains(searchQuery, ignoreCase = true) || 
                 it.email.contains(searchQuery, ignoreCase = true) 
             }
         }
+        
+        filtered
     }
     
     val groupedProviders = remember(employees, filterRoles) {
@@ -145,6 +151,49 @@ fun EmployeeListScreen(
                 .clip(RoundedCornerShape(99.dp))
                 .background(Mustard)
         )
+
+        // ── Category Filters (Proveedores solo) ──────────────────
+        if (filterRoles?.contains("Proveedor") == true) {
+            val allCategories = remember(allEmployees) {
+                val cats = mutableSetOf<String>()
+                allEmployees.filter { it.puesto == "Proveedor" }.forEach { emp ->
+                    if (emp.tipoTrabajo.isEmpty()) cats.add("General")
+                    else cats.addAll(emp.tipoTrabajo)
+                }
+                cats.toList().sorted()
+            }
+            
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item {
+                    FilterChip(
+                        selected = selectedCategory == null,
+                        onClick = { selectedCategory = null },
+                        label = { Text("Todos") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Teal,
+                            selectedLabelColor = Color.White
+                        )
+                    )
+                }
+                items(allCategories) { cat ->
+                    FilterChip(
+                        selected = selectedCategory == cat,
+                        onClick = { selectedCategory = cat },
+                        label = { Text(cat) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Teal,
+                            selectedLabelColor = Color.White
+                        )
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         // ── Error ────────────────────────────────────────────────
         if (error != null) {
