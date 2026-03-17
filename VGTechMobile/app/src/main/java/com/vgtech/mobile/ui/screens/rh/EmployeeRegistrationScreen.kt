@@ -51,7 +51,7 @@ fun EmployeeRegistrationScreen(
     val puestos = listOf("Consultor", "Supervisor", "Administrativo", "RH", "Proveedor")
 
     var tipoTrabajo by remember { mutableStateOf<Set<String>>(emptySet()) }
-    val tiposTrabajoOptions = listOf("Mantenimiento", "Limpieza", "Seguridad", "Electricidad", "Plomería", "Alimentos")
+    val tiposTrabajoOptions = listOf("Construcción de Puentes", "Edificación Vertical", "Cimentación Profunda", "Pavimentación y Asfaltado", "Obra Civil General", "Estructuras Metálicas")
 
     val isLoading = registrationState is RegistrationState.Loading
     val errorMessage = (registrationState as? RegistrationState.Error)?.message
