@@ -50,14 +50,23 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     // ── Sign In ──────────────────────────────────────────────────────
 
     fun signIn(email: String, password: String) {
-        if (email.isBlank() || password.isBlank()) {
+        val trimmedEmail = email.trim()
+        val trimmedPassword = password.trim()
+
+        if (trimmedEmail.isBlank() || trimmedPassword.isBlank()) {
             _authState.value = AuthState.Error("Por favor ingresa correo y contraseña")
             return
         }
+
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+            _authState.value = AuthState.Error("Formato de correo electrónico inválido")
+            return
+        }
+
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             try {
-                val role = authRepository.signIn(email, password)
+                val role = authRepository.signIn(trimmedEmail, trimmedPassword)
                 _authState.value = AuthState.Success(role)
             } catch (e: Exception) {
                 _authState.value = AuthState.Error(
@@ -74,7 +83,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _authState.value = AuthState.Error("El nombre es obligatorio")
             return
         }
-        if (email.isBlank() || !email.contains("@")) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank() || !trimmedEmail.contains("@")) {
             _authState.value = AuthState.Error("Ingresa un correo electrónico válido")
             return
         }
@@ -91,7 +101,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val employee = com.vgtech.mobile.data.model.Employee(
                     nombreCompleto = nombre,
-                    email = email,
+                    email = trimmedEmail,
                     password = password,
                     puesto = puesto
                 )

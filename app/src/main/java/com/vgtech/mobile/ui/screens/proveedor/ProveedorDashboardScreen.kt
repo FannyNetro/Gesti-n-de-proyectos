@@ -1,59 +1,571 @@
 package com.vgtech.mobile.ui.screens.proveedor
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import com.vgtech.mobile.data.local.InternalDb
+import com.vgtech.mobile.data.model.Project
+import com.vgtech.mobile.data.model.ProjectProgress
+import com.vgtech.mobile.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProveedorDashboardScreen(onLogout: () -> Unit) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Mis Proyectos", "Nueva Cotización", "Evaluaciones")
+    var selectedProjectForDetail by remember { mutableStateOf<Project?>(null) }
+    var showReportDialogFor by remember { mutableStateOf<Project?>(null) }
+    
+    val tabs = listOf(
+        TabItem("Activos", Icons.Default.Engineering),
+        TabItem("Historial", Icons.Default.History),
+        TabItem("Cotizar", Icons.Default.AddBusiness),
+        TabItem("Reportes", Icons.Default.Assessment)
+    )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Panel de Proveedor") },
+                title = { 
+                    Column {
+                        Text("VG Tech", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+                        Text("Panel de Proveedor", style = MaterialTheme.typography.labelMedium, color = Teal)
+                    }
+                },
                 actions = {
-                    TextButton(onClick = onLogout) { Text("Salir", color = MaterialTheme.colorScheme.error) }
-                }
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Salir", tint = Color.Red)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceWhite)
             )
         }
     ) { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues)) {
-            TabRow(selectedTabIndex = selectedTab) {
-                tabs.forEachIndexed { index, title ->
+        Column(modifier = Modifier.padding(paddingValues).fillMaxSize().background(SurfaceWhite)) {
+            ScrollableTabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = SurfaceWhite,
+                contentColor = Teal,
+                edgePadding = 16.dp,
+                divider = {}
+            ) {
+                tabs.forEachIndexed { index, item ->
                     Tab(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        text = { Text(title) }
+                        text = { Text(item.title, fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal) },
+                        icon = { Icon(item.icon, contentDescription = null) }
                     )
                 }
             }
 
-            when (selectedTab) {
-                0 -> ProyectosActivosView()
-                1 -> FormularioCotizacionView()
-                2 -> HistorialEvaluacionesView()
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (selectedTab) {
+                    0 -> ProyectosActivosView(
+                        onProjectClick = { selectedProjectForDetail = it },
+                        onReportClick = { showReportDialogFor = it }
+                    )
+                    1 -> HistorialProyectosView()
+                    2 -> FormularioCotizacionView()
+                    3 -> HistorialReportesView()
+                }
+            }
+        }
+
+        if (selectedProjectForDetail != null) {
+            ProjectDetailDialog(
+                project = selectedProjectForDetail!!,
+                onDismiss = { selectedProjectForDetail = null },
+                onReportProgress = { 
+                    showReportDialogFor = it
+                    selectedProjectForDetail = null
+                }
+            )
+        }
+
+        if (showReportDialogFor != null) {
+            ReportProgressDialog(
+                project = showReportDialogFor!!,
+                onDismiss = { showReportDialogFor = null },
+                onSend = { report ->
+                    InternalDb.addProjectProgress(report)
+                    showReportDialogFor = null
+                }
+            )
+        }
+    }
+}
+
+data class TabItem(val title: String, val icon: ImageVector)
+
+@Composable
+fun ProyectosActivosView(onProjectClick: (Project) -> Unit, onReportClick: (Project) -> Unit) {
+    val projects by InternalDb.projects.collectAsState()
+    val providerProjects = remember(projects) { projects.filter { it.status != "Finalizado" } }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item { 
+            Text("Proyectos en Curso", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+        }
+        
+        if (providerProjects.isEmpty()) {
+            item {
+                Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No tienes proyectos activos.", color = TextMuted)
+                }
+            }
+        } else {
+            items(providerProjects) { project ->
+                ProjectCard(
+                    project = project,
+                    onClick = { onProjectClick(project) },
+                    onReportClick = { onReportClick(project) }
+                )
             }
         }
     }
 }
 
 @Composable
-fun ProyectosActivosView() {
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Proyectos Activos", style = MaterialTheme.typography.titleLarge)
-        Card(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Edificio Reforma 222", style = MaterialTheme.typography.titleMedium)
-                Text("Avance Actual: 45%")
+fun ProjectCard(project: Project, onClick: () -> Unit, onReportClick: () -> Unit) {
+    val statusColor = when(project.status) {
+        "En Progreso" -> Teal
+        "Recién Iniciado" -> Color(0xFFFFA000)
+        else -> Navy
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(project.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy)
+                    Text(project.description, style = MaterialTheme.typography.bodySmall, color = Teal, fontWeight = FontWeight.Medium)
+                }
+                Surface(
+                    color = statusColor.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        project.status,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = statusColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LinearProgressIndicator(
+                    progress = { project.progress },
+                    modifier = Modifier.weight(1f).height(8.dp),
+                    color = Teal,
+                    trackColor = TealLight.copy(alpha = 0.3f),
+                    strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("${(project.progress * 100).toInt()}%", fontWeight = FontWeight.Bold, color = Navy)
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Button(
+                onClick = onReportClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Navy),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Reportar Avance")
+            }
+        }
+    }
+}
+
+@Composable
+fun ProjectDetailDialog(project: Project, onDismiss: () -> Unit, onReportProgress: (Project) -> Unit) {
+    val reports by InternalDb.projectProgressReports.collectAsState()
+    val projectReports = remember(reports) { reports.filter { it.projectId == project.id }.sortedByDescending { it.date } }
+    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceWhite)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(project.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Navy)
+                        Text(project.description, color = Teal)
+                    }
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null) }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LinearProgressIndicator(
+                        progress = { project.progress },
+                        modifier = Modifier.weight(1f).height(10.dp),
+                        color = Teal,
+                        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("${(project.progress * 100).toInt()}%", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge, color = Navy)
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = { onReportProgress(project) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Teal),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Add, null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Nuevo Reporte de Avance")
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                Text("Historial de Avances", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy)
                 Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = { /* Abrir modal reporte avance */ }) {
-                    Text("Reportar Avance")
+
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (projectReports.isEmpty()) {
+                        item { Text("No hay reportes registrados para este proyecto.", style = MaterialTheme.typography.bodySmall, color = TextMuted) }
+                    } else {
+                        items(projectReports) { report ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                        Text(report.reportType, style = MaterialTheme.typography.labelLarge, color = Teal, fontWeight = FontWeight.Bold)
+                                        Text(sdf.format(Date(report.date)), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                                    }
+                                    Text("Avance: ${report.progressPercentage}%", fontWeight = FontWeight.Bold, color = Navy)
+                                    Text(report.description, style = MaterialTheme.typography.bodySmall)
+                                    
+                                    if (report.highlights.isNotBlank()) {
+                                        Text("Puntos Positivos:", style = MaterialTheme.typography.labelSmall, color = SuccessGreen, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+                                        Text(report.highlights, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    if (report.issues.isNotBlank()) {
+                                        Text("Obstáculos / Problemas:", style = MaterialTheme.typography.labelSmall, color = Color.Red, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+                                        Text(report.issues, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ReportProgressDialog(
+    project: Project,
+    onDismiss: () -> Unit,
+    onSend: (ProjectProgress) -> Unit
+) {
+    var percentage by remember { mutableFloatStateOf(project.progress * 100f) }
+    var description by remember { mutableStateOf(project.description) }
+    var reportType by remember { mutableStateOf("Diario") }
+    var highlights by remember { mutableStateOf("") }
+    var issues by remember { mutableStateOf("") }
+    var delayReason by remember { mutableStateOf("") }
+    
+    val reportTypes = listOf("Diario", "Semanal", "Mensual")
+    val scrollState = rememberScrollState()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.9f)
+        ) {
+            Column(modifier = Modifier.padding(24.dp).verticalScroll(scrollState)) {
+                Text("Nuevo Reporte de Avance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+                Text(project.title, style = MaterialTheme.typography.bodySmall, color = Teal)
+                
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text("Frecuencia del Reporte", style = MaterialTheme.typography.labelMedium, color = Navy)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    reportTypes.forEach { type ->
+                        FilterChip(
+                            selected = reportType == type,
+                            onClick = { reportType = type },
+                            label = { Text(type) }
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text("Porcentaje de avance: ${percentage.toInt()}%", fontWeight = FontWeight.Bold, color = Navy)
+                Slider(
+                    value = percentage,
+                    onValueChange = { percentage = it },
+                    valueRange = 0f..100f,
+                    steps = 19,
+                    colors = SliderDefaults.colors(thumbColor = Teal, activeTrackColor = Teal)
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Actividad Principal / Fase Actual") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = highlights,
+                    onValueChange = { highlights = it },
+                    label = { Text("Puntos Positivos / Logros") },
+                    placeholder = { Text("¿Qué salió bien?") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = issues,
+                    onValueChange = { issues = it },
+                    label = { Text("Obstáculos / Problemas") },
+                    placeholder = { Text("¿Qué salió mal?") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = delayReason,
+                    onValueChange = { delayReason = it },
+                    label = { Text("Motivo de retraso (si aplica)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancelar", color = TextMuted)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { 
+                            onSend(ProjectProgress(
+                                projectId = project.id,
+                                projectTitle = project.title,
+                                providerUid = "prov-uid", 
+                                providerName = "Proveedor General",
+                                progressPercentage = percentage.toInt(),
+                                description = description,
+                                reportType = reportType,
+                                highlights = highlights,
+                                issues = issues,
+                                delayReason = if (delayReason.isBlank()) null else delayReason
+                            ))
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Teal),
+                        enabled = description.isNotBlank(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Enviar Reporte")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HistorialProyectosView() {
+    val projects by InternalDb.projects.collectAsState()
+    val finishedProjects = remember(projects) { projects.filter { it.status == "Finalizado" } }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text("Proyectos Finalizados", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+            Text("Registro de obras concluidas satisfactoriamente", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        if (finishedProjects.isEmpty()) {
+            item {
+                Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No hay proyectos finalizados aún.", color = TextMuted)
+                }
+            }
+        } else {
+            items(finishedProjects) { proyecto ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(TealLight.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Teal)
+                        }
+                        
+                        Spacer(modifier = Modifier.width(16.dp))
+                        
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(proyecto.title, fontWeight = FontWeight.Bold, color = Navy)
+                            Text(proyecto.description, style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        }
+                        
+                        Text(
+                            "Completado",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Teal,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HistorialReportesView() {
+    val reports by InternalDb.projectProgressReports.collectAsState()
+    val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { 
+            Text("Historial de Avances", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+            Text("Reportes enviados a supervisión", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        if (reports.isEmpty()) {
+            item {
+                Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No has enviado reportes de avance todavía.", color = TextMuted)
+                }
+            }
+        } else {
+            items(reports.sortedByDescending { it.date }) { report ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Assessment, contentDescription = null, tint = Teal, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(report.reportType, style = MaterialTheme.typography.labelLarge, color = Teal, fontWeight = FontWeight.Bold)
+                                }
+                                Text(report.projectTitle, fontWeight = FontWeight.Bold, color = Navy)
+                            }
+                            Text("${report.progressPercentage}%", fontWeight = FontWeight.ExtraBold, color = Teal, style = MaterialTheme.typography.titleLarge)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(sdf.format(Date(report.date)), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.LightGray.copy(alpha = 0.3f))
+                        
+                        Text(report.description, color = Navy, style = MaterialTheme.typography.bodyMedium)
+                        
+                        if (report.highlights.isNotBlank()) {
+                            Text("Puntos Positivos:", style = MaterialTheme.typography.labelSmall, color = SuccessGreen, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                            Text(report.highlights, style = MaterialTheme.typography.bodySmall)
+                        }
+                        
+                        if (report.issues.isNotBlank()) {
+                            Text("Obstáculos / Problemas:", style = MaterialTheme.typography.labelSmall, color = Color.Red, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                            Text(report.issues, style = MaterialTheme.typography.bodySmall)
+                        }
+
+                        if (!report.delayReason.isNullOrBlank()) {
+                            Surface(
+                                color = Color.Red.copy(alpha = 0.05f),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.padding(top = 8.dp).fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Text("MOTIVO DE RETRASO:", style = MaterialTheme.typography.labelSmall, color = Color.Red, fontWeight = FontWeight.ExtraBold)
+                                    Text(report.delayReason, style = MaterialTheme.typography.bodySmall, color = Color.Red)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -64,36 +576,58 @@ fun ProyectosActivosView() {
 fun FormularioCotizacionView() {
     var costo by remember { mutableStateOf("") }
     var tiempo by remember { mutableStateOf("") }
+    val scrollState = rememberScrollState()
     
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Cargar Nueva Cotización", style = MaterialTheme.typography.titleLarge)
+    Column(modifier = Modifier.padding(16.dp).verticalScroll(scrollState)) {
+        Text("Cargar Nueva Cotización", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+        Text("Envía tu propuesta comercial para nuevos proyectos", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        OutlinedTextField(
+            value = costo, 
+            onValueChange = { costo = it }, 
+            label = { Text("Costo Propuesto") }, 
+            modifier = Modifier.fillMaxWidth(),
+            prefix = { Text("$ ") },
+            shape = RoundedCornerShape(12.dp)
+        )
         Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(value = costo, onValueChange = { costo = it }, label = { Text("Costo Propuesto ($)") }, modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(value = tiempo, onValueChange = { tiempo = it }, label = { Text("Tiempo Estimado (Días)") }, modifier = Modifier.fillMaxWidth())
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(onClick = { /* Lógica para elegir PDF y FirebaseStorage */ }, modifier = Modifier.fillMaxWidth()) {
-            Text("Adjuntar Archivo (PDF)")
-        }
+        OutlinedTextField(
+            value = tiempo, 
+            onValueChange = { tiempo = it }, 
+            label = { Text("Tiempo Estimado (Días)") }, 
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { /* save to Firestore */ }, modifier = Modifier.fillMaxWidth()) {
-            Text("Enviar Cotización")
-        }
-    }
-}
-
-@Composable
-fun HistorialEvaluacionesView() {
-    LazyColumn(modifier = Modifier.padding(16.dp)) {
-        item { Text("Evaluaciones Previas", style = MaterialTheme.typography.titleLarge) }
-        items(3) { 
-            Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Proyecto: Instalación Eléctrica Fase 1", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                    Text("Estado: Finalizado")
-                    Text("Retroalimentación: Excelente cumplimiento de tiempos.", color = MaterialTheme.colorScheme.primary)
+        
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = Color.LightGray.copy(alpha = 0.1f),
+            shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
+        ) {
+            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(40.dp), tint = Teal)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Selecciona tu archivo PDF", fontWeight = FontWeight.Bold)
+                Text("Máximo 10MB", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedButton(onClick = { }) {
+                    Text("Explorar Archivos", color = Teal)
                 }
             }
+        }
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        Button(
+            onClick = { }, 
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Teal),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Enviar Propuesta Formal", fontWeight = FontWeight.Bold)
         }
     }
 }
