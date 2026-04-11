@@ -18,5 +18,17 @@ data class ProjectProgress(
     val highlights: String = "", // Good things
     val issues: String = "", // Bad things / Obstacles
     val delayReason: String? = null,
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    
+    // Consultant Evaluation fields
+    val evaluated: Boolean = false,
+    val consultantEvaluation: String = "", // "Aprobado", "Con Observaciones", "Rechazado"
+    val consultantComments: String = "",
+    val evaluationRating: Float = 0f,
+    val evaluationImageUrl: String? = null,
+    
+    // Progress Modification (Consultant Correction)
+    val wasModified: Boolean = false,
+    val originalProgress: Int = 0,
+    val modificationReason: String = ""
 )

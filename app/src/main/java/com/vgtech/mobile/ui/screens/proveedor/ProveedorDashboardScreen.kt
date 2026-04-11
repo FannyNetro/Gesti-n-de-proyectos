@@ -6,10 +6,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.Message
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,8 +23,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.vgtech.mobile.data.local.InternalDb
+import com.vgtech.mobile.data.model.ChatMessage
 import com.vgtech.mobile.data.model.Project
 import com.vgtech.mobile.data.model.ProjectProgress
 import com.vgtech.mobile.ui.theme.*
@@ -34,8 +40,12 @@ fun ProveedorDashboardScreen(onLogout: () -> Unit) {
     var selectedProjectForDetail by remember { mutableStateOf<Project?>(null) }
     var showReportDialogFor by remember { mutableStateOf<Project?>(null) }
     
+    // For demo purposes, current provider UID
+    val currentProviderUid = "prov-uid"
+
     val tabs = listOf(
         TabItem("Activos", Icons.Default.Engineering),
+        TabItem("Mensajes", Icons.AutoMirrored.Filled.Message),
         TabItem("Historial", Icons.Default.History),
         TabItem("Cotizar", Icons.Default.AddBusiness),
         TabItem("Reportes", Icons.Default.Assessment)
@@ -59,7 +69,7 @@ fun ProveedorDashboardScreen(onLogout: () -> Unit) {
             )
         }
     ) { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues).fillMaxSize().background(SurfaceWhite)) {
+        Column(modifier = Modifier.padding(paddingValues).fillMaxSize().background(SurfaceGray)) {
             ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = SurfaceWhite,
@@ -82,12 +92,14 @@ fun ProveedorDashboardScreen(onLogout: () -> Unit) {
             Box(modifier = Modifier.fillMaxSize()) {
                 when (selectedTab) {
                     0 -> ProyectosActivosView(
+                        providerUid = currentProviderUid,
                         onProjectClick = { selectedProjectForDetail = it },
                         onReportClick = { showReportDialogFor = it }
                     )
-                    1 -> HistorialProyectosView()
-                    2 -> FormularioCotizacionView()
-                    3 -> HistorialReportesView()
+                    1 -> ProviderChatListScreen(currentProviderUid)
+                    2 -> HistorialProyectosView(currentProviderUid)
+                    3 -> FormularioCotizacionView()
+                    4 -> HistorialReportesView(currentProviderUid)
                 }
             }
         }
@@ -106,6 +118,7 @@ fun ProveedorDashboardScreen(onLogout: () -> Unit) {
         if (showReportDialogFor != null) {
             ReportProgressDialog(
                 project = showReportDialogFor!!,
+                providerUid = currentProviderUid,
                 onDismiss = { showReportDialogFor = null },
                 onSend = { report ->
                     InternalDb.addProjectProgress(report)
@@ -119,9 +132,141 @@ fun ProveedorDashboardScreen(onLogout: () -> Unit) {
 data class TabItem(val title: String, val icon: ImageVector)
 
 @Composable
-fun ProyectosActivosView(onProjectClick: (Project) -> Unit, onReportClick: (Project) -> Unit) {
+fun ProviderChatListScreen(providerUid: String) {
+    val allProjects by InternalDb.projects.collectAsState()
+    val providerProjects = allProjects.filter { it.providerUid == providerUid }
+    val selectedProjectForChatState = remember { mutableStateOf<Project?>(null) }
+
+    selectedProjectForChatState.value?.let { project ->
+        ProviderChatDetailScreen(
+            project = project,
+            providerUid = providerUid,
+            onBack = { selectedProjectForChatState.value = null }
+        )
+    } ?: run {
+        Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+            Text("Mensajes con Consultores", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Navy)
+            Text("Conversaciones con los consultores de tus proyectos.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+            
+            Spacer(modifier = Modifier.height(24.dp))
+
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val consultants = providerProjects.filter { it.consultantUid != null }
+                if (consultants.isEmpty()) {
+                    item { Text("No tienes consultores asignados en tus proyectos.", color = TextMuted) }
+                } else {
+                    items(consultants) { project ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { selectedProjectForChatState.value = project },
+                            colors = CardDefaults.cardColors(containerColor = SurfaceWhite)
+                        ) {
+                            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = Teal.copy(alpha = 0.1f)) {
+                                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Teal) }
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Consultor del Proyecto", fontWeight = FontWeight.Bold, color = Navy)
+                                    Text("Proyecto: ${project.title}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                                }
+                                Icon(Icons.Default.ChevronRight, null, tint = TextMuted)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProviderChatDetailScreen(project: Project, providerUid: String, onBack: () -> Unit) {
+    val allMessages by InternalDb.chatMessages.collectAsState()
+    val consultantUid = project.consultantUid ?: ""
+    val chatMessages = allMessages.filter { 
+        (it.senderUid == providerUid && it.receiverUid == consultantUid) || 
+        (it.senderUid == consultantUid && it.receiverUid == providerUid)
+    }.sortedBy { it.timestamp }
+
+    var messageText by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.fillMaxSize().background(SurfaceGray)) {
+        Surface(color = SurfaceWhite, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Navy) }
+                Column {
+                    Text("Consultor", fontWeight = FontWeight.Bold, color = Navy)
+                    Text(project.title, style = MaterialTheme.typography.labelSmall, color = Teal, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(chatMessages) { msg ->
+                val isMine = msg.senderUid == providerUid
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = if (isMine) Alignment.CenterEnd else Alignment.CenterStart) {
+                    Surface(
+                        color = if (isMine) Teal else Color.White,
+                        shape = RoundedCornerShape(
+                            topStart = 16.dp, 
+                            topEnd = 16.dp, 
+                            bottomStart = if (isMine) 16.dp else 0.dp, 
+                            bottomEnd = if (isMine) 0.dp else 16.dp
+                        ),
+                        modifier = Modifier.widthIn(max = 280.dp)
+                    ) {
+                        Text(
+                            text = msg.message,
+                            modifier = Modifier.padding(12.dp),
+                            color = if (isMine) Color.White else Navy,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        }
+
+        Surface(color = SurfaceWhite, modifier = Modifier.imePadding()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    placeholder = { Text("Escribe un mensaje al consultor...") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    maxLines = 3
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = {
+                        if (messageText.isNotBlank()) {
+                            InternalDb.addChatMessage(ChatMessage(
+                                senderUid = providerUid,
+                                receiverUid = consultantUid,
+                                projectId = project.id,
+                                message = messageText
+                            ))
+                            messageText = ""
+                        }
+                    },
+                    colors = IconButtonDefaults.iconButtonColors(containerColor = Teal, contentColor = Color.White),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, null)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProyectosActivosView(providerUid: String, onProjectClick: (Project) -> Unit, onReportClick: (Project) -> Unit) {
     val projects by InternalDb.projects.collectAsState()
-    val providerProjects = remember(projects) { projects.filter { it.status != "Finalizado" } }
+    val providerProjects = remember(projects) { projects.filter { it.providerUid == providerUid && it.status != "Finalizado" } }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -308,6 +453,7 @@ fun ProjectDetailDialog(project: Project, onDismiss: () -> Unit, onReportProgres
 @Composable
 fun ReportProgressDialog(
     project: Project,
+    providerUid: String,
     onDismiss: () -> Unit,
     onSend: (ProjectProgress) -> Unit
 ) {
@@ -409,7 +555,7 @@ fun ReportProgressDialog(
                             onSend(ProjectProgress(
                                 projectId = project.id,
                                 projectTitle = project.title,
-                                providerUid = "prov-uid", 
+                                providerUid = providerUid, 
                                 providerName = "Proveedor General",
                                 progressPercentage = percentage.toInt(),
                                 description = description,
@@ -432,9 +578,9 @@ fun ReportProgressDialog(
 }
 
 @Composable
-fun HistorialProyectosView() {
+fun HistorialProyectosView(providerUid: String) {
     val projects by InternalDb.projects.collectAsState()
-    val finishedProjects = remember(projects) { projects.filter { it.status == "Finalizado" } }
+    val finishedProjects = remember(projects) { projects.filter { it.providerUid == providerUid && it.status == "Finalizado" } }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -495,8 +641,9 @@ fun HistorialProyectosView() {
 }
 
 @Composable
-fun HistorialReportesView() {
+fun HistorialReportesView(providerUid: String) {
     val reports by InternalDb.projectProgressReports.collectAsState()
+    val providerReports = remember(reports) { reports.filter { it.providerUid == providerUid } }
     val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
 
     LazyColumn(
@@ -510,14 +657,14 @@ fun HistorialReportesView() {
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        if (reports.isEmpty()) {
+        if (providerReports.isEmpty()) {
             item {
                 Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No has enviado reportes de avance todavía.", color = TextMuted)
                 }
             }
         } else {
-            items(reports.sortedByDescending { it.date }) { report ->
+            items(providerReports.sortedByDescending { it.date }) { report ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color.White),

@@ -17,6 +17,7 @@ val MustardDark    = Color(0xFFD97706) // Amber 600
 
 val BackgroundLight = Color(0xFFFAFAFA) // Cleaner light background
 val SurfaceWhite    = Color(0xFFFFFFFF)
+val SurfaceGray     = Color(0xFFF1F5F9) // Slate 100
 
 val TextPrimary    = Color(0xFF0F172A)
 val TextMuted      = Color(0xFF64748B) // Slate 500

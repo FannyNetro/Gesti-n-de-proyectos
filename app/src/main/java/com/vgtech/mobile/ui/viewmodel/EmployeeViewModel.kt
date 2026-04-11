@@ -35,11 +35,6 @@ class EmployeeViewModel(application: Application) : AndroidViewModel(application
     private val _registrationState = MutableStateFlow<RegistrationState>(RegistrationState.Idle)
     val registrationState: StateFlow<RegistrationState> = _registrationState.asStateFlow()
 
-    // ── Stats ────────────────────────────────────────────────────────
-
-    private val _employeeCount = MutableStateFlow(0)
-    val employeeCount: StateFlow<Int> = _employeeCount.asStateFlow()
-
     // ── Init: start listening to Firestore ────────────────────────────
 
     init {
@@ -52,7 +47,6 @@ class EmployeeViewModel(application: Application) : AndroidViewModel(application
             try {
                 employeeRepository.getEmployees().collect { list ->
                     _employees.value = list
-                    _employeeCount.value = list.size
                     _isLoading.value = false
                 }
             } catch (e: Exception) {
@@ -108,7 +102,6 @@ class EmployeeViewModel(application: Application) : AndroidViewModel(application
             _registrationState.value = RegistrationState.Loading
             try {
                 val uid = authRepository.registerEmployee(
-                    context = getApplication(),
                     employee = employee
                 )
                 _registrationState.value = RegistrationState.Success(uid)
@@ -162,10 +155,6 @@ class EmployeeViewModel(application: Application) : AndroidViewModel(application
 
     fun resetRegistration() {
         _registrationState.value = RegistrationState.Idle
-    }
-
-    fun clearListError() {
-        _listError.value = null
     }
 }
 

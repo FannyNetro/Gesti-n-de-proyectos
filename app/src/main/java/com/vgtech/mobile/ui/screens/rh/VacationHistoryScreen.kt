@@ -21,7 +21,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.vgtech.mobile.data.local.InternalDb
@@ -39,7 +38,7 @@ fun VacationHistoryScreen() {
     val requests by InternalDb.vacationRequests.collectAsState()
     
     var searchQuery by remember { mutableStateOf("") }
-    var selectedEmployee by remember { mutableStateOf<Employee?>(null) }
+    val selectedEmployeeState = remember { mutableStateOf<Employee?>(null) }
     var showHistory by remember { mutableStateOf(false) }
 
     val filteredEmployees = remember(searchQuery, employees) {
@@ -127,7 +126,7 @@ fun VacationHistoryScreen() {
             ) {
                 item { Text("Selecciona un empleado para registrar vacaciones", style = MaterialTheme.typography.titleSmall, color = TextMuted) }
                 items(filteredEmployees) { emp ->
-                    EmployeeVacationRow(emp) { selectedEmployee = emp }
+                    EmployeeVacationRow(emp) { selectedEmployeeState.value = emp }
                 }
                 if (filteredEmployees.isEmpty()) {
                     item {
@@ -140,13 +139,13 @@ fun VacationHistoryScreen() {
         }
     }
 
-    if (selectedEmployee != null) {
+    selectedEmployeeState.value?.let { employee ->
         AddVacationDialog(
-            employee = selectedEmployee!!,
-            onDismiss = { selectedEmployee = null },
+            employee = employee,
+            onDismiss = { selectedEmployeeState.value = null },
             onConfirm = { request ->
                 InternalDb.addVacationRequest(request)
-                selectedEmployee = null
+                selectedEmployeeState.value = null
             }
         )
     }
@@ -220,7 +219,6 @@ fun VacationRequestItem(request: VacationRequest) {
 fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (VacationRequest) -> Unit) {
     var startDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var endDate by remember { mutableLongStateOf(System.currentTimeMillis() + 86400000L) }
-    var observations by remember { mutableStateOf("") }
     
     val context = LocalContext.current
     val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
@@ -229,13 +227,13 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
     val diff = endDate - startDate
     val daysRequested = if (diff >= 0) (TimeUnit.MILLISECONDS.toDays(diff).toInt() + 1) else 0
 
-    // Datos del saldo (Simulación basada en la imagen)
+    // Datos del saldo
     val pendActual = employee.diasVacaciones
     val pendAnteriores = 0 
     val totalDispPend = pendActual + pendAnteriores
     val finalDisponibles = (totalDispPend - daysRequested).coerceAtLeast(0)
     
-    val canRegister = daysRequested > 0 && daysRequested <= totalDispPend
+    val canRegister = daysRequested in 1..totalDispPend
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -251,7 +249,6 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
                 modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Header (Fecha de solicitud arriba a la derecha)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Column(horizontalAlignment = Alignment.End) {
                         Text("Fecha de solicitud:", style = MaterialTheme.typography.labelSmall, color = TextMuted)
@@ -261,7 +258,6 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
 
                 Text("Solicitud de Vacaciones", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Navy, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
 
-                // Datos Empleado (Estilo formulario)
                 Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     FormLabelValue("Nombre:", employee.nombreCompleto.uppercase())
                     Row(modifier = Modifier.fillMaxWidth()) {
@@ -272,7 +268,6 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
 
                 HorizontalDivider(thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.5f))
 
-                // Selección de Fechas (Con estilo de la imagen)
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Fecha inició de Vacaciones:", style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(180.dp))
@@ -284,7 +279,6 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
                         
                         Spacer(modifier = Modifier.width(16.dp))
                         
-                        // Recuadro Total Días (Rojo como en la imagen)
                         Box(
                             modifier = Modifier
                                 .border(1.5.dp, ErrorRed, RoundedCornerShape(8.dp))
@@ -302,7 +296,6 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Tabla de Cálculos (Exactamente como la imagen)
                 Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     CalculationLine("Días de Vacaciones pendientes de disfrutar del periodo actual:", "$pendActual")
                     CalculationLine("Días de Vacaciones pendientes de disfrutar de periodos anteriores:", "$pendAnteriores")
@@ -315,7 +308,6 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
                     Text("⚠️ Saldo insuficiente.", color = ErrorRed, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 }
 
-                // Acciones
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancelar", color = Navy, fontWeight = FontWeight.Bold) }
                     Button(
@@ -325,8 +317,7 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
                                 employeeName = employee.nombreCompleto,
                                 startDate = startDate,
                                 endDate = endDate,
-                                daysRequested = daysRequested,
-                                observations = observations
+                                daysRequested = daysRequested
                             ))
                         },
                         enabled = canRegister,

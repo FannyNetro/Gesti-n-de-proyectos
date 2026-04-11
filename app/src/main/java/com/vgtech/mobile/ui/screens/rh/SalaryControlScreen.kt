@@ -5,9 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
@@ -35,7 +33,7 @@ fun SalaryControlScreen() {
     val workLogs by InternalDb.workLogs.collectAsState()
     
     var searchQuery by remember { mutableStateOf("") }
-    var selectedEmployee by remember { mutableStateOf<Employee?>(null) }
+    val selectedEmployeeState = remember { mutableStateOf<Employee?>(null) }
     var showWorkLogs by remember { mutableStateOf(false) }
 
     val filteredEmployees = remember(searchQuery, employees) {
@@ -120,29 +118,29 @@ fun SalaryControlScreen() {
             ) {
                 item { Text("Gestión de Salarios y Tarifas", style = MaterialTheme.typography.titleSmall, color = TextMuted) }
                 items(filteredEmployees) { emp ->
-                    SalaryEmployeeRow(emp, currencyFormatter) { selectedEmployee = emp }
+                    SalaryEmployeeRow(emp, currencyFormatter) { selectedEmployeeState.value = emp }
                 }
             }
         }
     }
 
-    if (selectedEmployee != null) {
+    selectedEmployeeState.value?.let { employee ->
         ManageSalaryDialog(
-            employee = selectedEmployee!!,
-            onDismiss = { selectedEmployee = null },
+            employee = employee,
+            onDismiss = { selectedEmployeeState.value = null },
             onConfirmAddHours = { hours, rate, obs ->
                 InternalDb.addWorkLog(WorkLog(
-                    employeeUid = selectedEmployee!!.uid,
-                    employeeName = selectedEmployee!!.nombreCompleto,
+                    employeeUid = employee.uid,
+                    employeeName = employee.nombreCompleto,
                     hoursWorked = hours,
                     hourlyRateAtTime = rate,
                     observations = obs
                 ))
-                selectedEmployee = null
+                selectedEmployeeState.value = null
             },
             onUpdateRates = { sueldo, hourly ->
-                InternalDb.updateEmployeeRates(selectedEmployee!!.uid, sueldo, hourly)
-                selectedEmployee = null
+                InternalDb.updateEmployeeRates(employee.uid, sueldo, hourly)
+                selectedEmployeeState.value = null
             }
         )
     }

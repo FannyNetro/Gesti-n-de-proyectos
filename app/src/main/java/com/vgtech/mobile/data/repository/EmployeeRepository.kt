@@ -22,37 +22,19 @@ class EmployeeRepository {
         }
     }
 
-    // ── Get single employee ──────────────────────────────────────────
-
-    suspend fun getEmployee(uid: String): Employee? {
-        return InternalDb.getEmployeeById(uid)
-    }
-
     // ── Update employee ──────────────────────────────────────────────
 
-    suspend fun updateEmployee(employee: Employee) {
+    fun updateEmployee(employee: Employee) {
         InternalDb.updateEmployee(employee)
     }
 
     // ── Deactivate Employee ──────────────────────────────────────────
-    suspend fun deactivateEmployee(uid: String, motivo: String) {
-        // En mem (Mock):
+    fun deactivateEmployee(uid: String, motivo: String) {
         InternalDb.deactivateEmployee(uid, motivo)
-        // En Firestore (Futuro):
-        // employeeCollection.document(uid).update(mapOf("activo" to false, "motivoInactivo" to motivo)).await()
     }
 
     // ── Reset Employee Password ──────────────────────────────────────
-    suspend fun resetPassword(uid: String, newPassword: String) {
-        // En mem (Mock):
+    fun resetPassword(uid: String, newPassword: String) {
         InternalDb.updateEmployeePassword(uid, newPassword)
-        // En Firebase Auth / Firestore (Futuro):
-        // Se requeriría usar Firebase Admin SDK o functions si se desea cambiar la contraseña de otro usuario.
-    }
-
-    // ── Get employee count ───────────────────────────────────────────
-
-    suspend fun getActiveCount(): Int {
-        return InternalDb.employees.value.count { it.activo }
     }
 }

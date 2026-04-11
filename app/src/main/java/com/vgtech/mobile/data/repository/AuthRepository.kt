@@ -1,6 +1,5 @@
 package com.vgtech.mobile.data.repository
 
-import android.content.Context
 import com.vgtech.mobile.data.local.InternalDb
 import com.vgtech.mobile.data.model.Employee
 import com.vgtech.mobile.data.model.UserRole
@@ -16,12 +15,9 @@ class AuthRepository {
     var currentUser: Employee? = null
         private set
 
-    val isLoggedIn: Boolean
-        get() = currentUser != null
-
     // ── Sign In ──────────────────────────────────────────────────────
 
-    suspend fun signIn(email: String, password: String): UserRole {
+    fun signIn(email: String, password: String): UserRole {
         val user = InternalDb.getEmployeeByEmail(email)
             ?: throw Exception("Usuario no encontrado")
 
@@ -39,7 +35,7 @@ class AuthRepository {
 
     // ── Role Resolution ──────────────────────────────────────────────
 
-    suspend fun getUserRole(uid: String): UserRole {
+    fun getUserRole(uid: String): UserRole {
         val user = InternalDb.getEmployeeById(uid)
             ?: throw Exception("Perfil de empleado no encontrado")
         return user.toRole()
@@ -47,8 +43,7 @@ class AuthRepository {
 
     // ── Employee Registration ────────────────────────────────────────
 
-    suspend fun registerEmployee(
-        context: Context,
+    fun registerEmployee(
         employee: Employee
     ): String {
         // Enforce uniqueness for email
@@ -65,7 +60,7 @@ class AuthRepository {
 
     // ── Self-Registration ────────────────────────────────────────────
 
-    suspend fun signUp(employee: Employee): UserRole {
+    fun signUp(employee: Employee): UserRole {
         // Enforce uniqueness for email
         if (InternalDb.getEmployeeByEmail(employee.email) != null) {
             throw Exception("El correo electrónico ya está registrado")
