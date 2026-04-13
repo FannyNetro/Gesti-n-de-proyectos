@@ -150,28 +150,8 @@ private fun DashboardTab(
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Header
-        item {
-            Text(
-                "Bienvenido, Supervisor",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = Navy
-            )
-            Text(
-                "Resumen de proyectos y equipo",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextMuted
-            )
-            Box(
-                modifier = Modifier
-                    .padding(top = 8.dp)
-                    .width(36.dp)
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(99.dp))
-                    .background(Mustard)
-            )
-        }
+        // Header moved directly to cards to clean up the UI
+        item { Spacer(modifier = Modifier.height(4.dp)) }
 
         // KPI Cards
         item {

@@ -232,7 +232,20 @@ object InternalDb {
                 providerName = "Electro Servicios MX",
                 amount = 450_000.0,
                 estimatedDays = 45,
-                description = "Incluye cableado, tableros y luminarias LED."
+                description = "Incluye cableado, tableros y luminarias LED.",
+                sentToClient = true
+            ),
+            Quotation(
+                id = "quot-2",
+                invitationId = "inv-2",
+                projectId = "proj-2",
+                projectTitle = "Residencial Las Lomas",
+                providerUid = "prov-2",
+                providerName = "Materiales del Norte",
+                amount = 890_000.0,
+                estimatedDays = 60,
+                description = "Estructura principal y cimentación profunda. Materiales premium.",
+                sentToClient = true
             )
         )
 
@@ -461,6 +474,32 @@ object InternalDb {
         if (index != -1) {
             currentList[index] = currentList[index].copy(sentToClient = true)
             _quotations.value = currentList
+        }
+    }
+
+    fun updateQuotationClientStatus(quotationId: String, status: String) {
+        val currentList = _quotations.value.toMutableList()
+        val index = currentList.indexOfFirst { it.id == quotationId }
+        val quotation = currentList.getOrNull(index)
+        if (quotation != null) {
+            currentList[index] = quotation.copy(clientStatus = status)
+            _quotations.value = currentList
+            
+            // If the client approves the quotation, the project goes to "En Progreso"
+            // and we assign the provider if not already
+            if (status == "Aprobada") {
+                val currentProjects = _projects.value.toMutableList()
+                val projIndex = currentProjects.indexOfFirst { it.id == quotation.projectId }
+                if (projIndex != -1) {
+                    val p = currentProjects[projIndex]
+                    currentProjects[projIndex] = p.copy(
+                        status = "En Progreso",
+                        providerUid = quotation.providerUid,
+                        providerName = quotation.providerName
+                    )
+                    _projects.value = currentProjects
+                }
+            }
         }
     }
 
