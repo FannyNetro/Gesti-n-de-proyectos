@@ -38,7 +38,7 @@ fun SalaryControlScreen() {
 
     val filteredEmployees = remember(searchQuery, employees) {
         employees.filter { 
-            it.activo && it.puesto != "Proveedor" &&
+            it.activo && it.puesto != "Proveedor" && it.puesto != "Cliente" &&
             (searchQuery.isBlank() || it.nombreCompleto.contains(searchQuery, ignoreCase = true))
         }
     }

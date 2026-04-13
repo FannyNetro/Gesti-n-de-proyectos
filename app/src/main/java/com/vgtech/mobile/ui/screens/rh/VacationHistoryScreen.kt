@@ -57,6 +57,7 @@ fun VacationHistoryScreen() {
         employees.filter { 
             it.activo && 
             it.puesto != "Proveedor" && 
+            it.puesto != "Cliente" &&
             (searchQuery.isBlank() || it.nombreCompleto.contains(searchQuery, ignoreCase = true))
         }
     }

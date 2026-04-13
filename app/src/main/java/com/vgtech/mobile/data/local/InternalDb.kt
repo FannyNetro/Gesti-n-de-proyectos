@@ -44,14 +44,14 @@ object InternalDb {
 
         // ── Expanded seed users ──────────────────────────────────
         val generatedUsers = mutableListOf<Employee>()
-        generatedUsers.add(Employee(uid = "admin-uid", nombreCompleto = "Admin RH User", email = "admin@vgtech.com", puesto = "RH", password = "admin", activo = true))
-        generatedUsers.add(Employee(uid = "sup-uid", nombreCompleto = "Carlos Mendoza", email = "supervisor@vgtech.com", puesto = "Supervisor", password = "super", activo = true))
-        generatedUsers.add(Employee(uid = provUid, nombreCompleto = "Proveedor General", email = "proveedor@vgtech.com", puesto = "Proveedor", password = "prov", activo = true, tipoTrabajo = listOf("Instalaciones", "Obra Civil")))
-        generatedUsers.add(Employee(uid = "prov-2", nombreCompleto = "Materiales del Norte", email = "norte@vgtech.com", puesto = "Proveedor", password = "prov2", activo = true, tipoTrabajo = listOf("Materiales", "Acabados")))
-        generatedUsers.add(Employee(uid = "prov-3", nombreCompleto = "Electro Servicios MX", email = "electro@vgtech.com", puesto = "Proveedor", password = "prov3", activo = true, tipoTrabajo = listOf("Eléctrico", "Iluminación")))
-        generatedUsers.add(Employee(uid = currentConsultantUid, nombreCompleto = "Consultor Externo", email = "consultor@vgtech.com", puesto = "Consultor", password = "cons", activo = true))
-        generatedUsers.add(Employee(uid = "cons-2", nombreCompleto = "Ana García López", email = "ana@vgtech.com", puesto = "Consultor", password = "cons2", activo = true))
-        generatedUsers.add(Employee(uid = "cons-3", nombreCompleto = "Roberto Díaz Martín", email = "roberto@vgtech.com", puesto = "Consultor", password = "cons3", activo = true))
+        generatedUsers.add(Employee(uid = "admin-uid", nombreCompleto = "Admin RH User", email = "admin@vgtech.com", puesto = "RH", password = "admin", activo = true, sueldo = 25000.0, pagoPorHora = 156.25, diasVacaciones = 12))
+        generatedUsers.add(Employee(uid = "sup-uid", nombreCompleto = "Carlos Mendoza", email = "supervisor@vgtech.com", puesto = "Supervisor", password = "super", activo = true, sueldo = 35000.0, pagoPorHora = 218.75, diasVacaciones = 14))
+        generatedUsers.add(Employee(uid = provUid, nombreCompleto = "Proveedor General", email = "proveedor@vgtech.com", puesto = "Proveedor", password = "prov", activo = true, tipoTrabajo = listOf("Instalaciones", "Obra Civil"), sueldo = 0.0, pagoPorHora = 180.0, diasVacaciones = 0))
+        generatedUsers.add(Employee(uid = "prov-2", nombreCompleto = "Materiales del Norte", email = "norte@vgtech.com", puesto = "Proveedor", password = "prov2", activo = true, tipoTrabajo = listOf("Materiales", "Acabados"), sueldo = 0.0, pagoPorHora = 160.0, diasVacaciones = 0))
+        generatedUsers.add(Employee(uid = "prov-3", nombreCompleto = "Electro Servicios MX", email = "electro@vgtech.com", puesto = "Proveedor", password = "prov3", activo = true, tipoTrabajo = listOf("Eléctrico", "Iluminación"), sueldo = 0.0, pagoPorHora = 200.0, diasVacaciones = 0))
+        generatedUsers.add(Employee(uid = currentConsultantUid, nombreCompleto = "Consultor Externo", email = "consultor@vgtech.com", puesto = "Consultor", password = "cons", activo = true, sueldo = 28000.0, pagoPorHora = 175.0, diasVacaciones = 10))
+        generatedUsers.add(Employee(uid = "cons-2", nombreCompleto = "Ana García López", email = "ana@vgtech.com", puesto = "Consultor", password = "cons2", activo = true, sueldo = 30000.0, pagoPorHora = 187.50, diasVacaciones = 12))
+        generatedUsers.add(Employee(uid = "cons-3", nombreCompleto = "Roberto Díaz Martín", email = "roberto@vgtech.com", puesto = "Consultor", password = "cons3", activo = true, sueldo = 26000.0, pagoPorHora = 162.50, diasVacaciones = 8))
         generatedUsers.add(Employee(uid = "cliente-uid", nombreCompleto = "Cliente Corporativo", email = "cliente@vgtech.com", puesto = "Cliente", password = "cli", activo = true))
 
         _employees.value = generatedUsers
