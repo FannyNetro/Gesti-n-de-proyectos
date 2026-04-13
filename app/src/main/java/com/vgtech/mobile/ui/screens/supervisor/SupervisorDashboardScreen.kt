@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
@@ -32,6 +33,7 @@ import com.vgtech.mobile.data.model.*
 import com.vgtech.mobile.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.launch
 
 // ═════════════════════════════════════════════════════════════════
 //  SupervisorDashboardScreen — HU1 through HU8
@@ -42,7 +44,9 @@ import java.util.*
 fun SupervisorDashboardScreen(
     onLogout: () -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    var selectedTab by remember { mutableStateOf("Tablero") }
 
     val projects by InternalDb.projects.collectAsState()
     val employees by InternalDb.employees.collectAsState()
@@ -54,80 +58,58 @@ fun SupervisorDashboardScreen(
     val consultants = employees.filter { it.puesto.lowercase() == "consultor" && it.activo }
     val providers = employees.filter { it.puesto.lowercase() == "proveedor" && it.activo }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            "VG Tech",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = SurfaceWhite
-                        )
-                        Text(
-                            "Panel de Supervisor",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = SurfaceWhite.copy(alpha = 0.6f)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Navy
-                ),
-                actions = {
-                    IconButton(onClick = onLogout) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Logout,
-                            contentDescription = "Cerrar sesión",
-                            tint = SurfaceWhite.copy(alpha = 0.7f)
-                        )
-                    }
-                }
-            )
-        },
-        bottomBar = {
-            NavigationBar(
-                containerColor = SurfaceWhite,
-                tonalElevation = 8.dp
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = Navy,
+                drawerShape = RoundedCornerShape(0.dp),
+                modifier = Modifier.width(300.dp)
             ) {
-                val tabs = listOf(
-                    Triple("Inicio", Icons.Default.Dashboard, 0),
-                    Triple("Proyectos", Icons.Default.Folder, 1),
-                    Triple("Avances", Icons.Default.Timeline, 2),
-                    Triple("Evaluar", Icons.Default.Star, 3),
-                    Triple("Reportes", Icons.Default.Assessment, 4)
-                )
-                tabs.forEach { (label, icon, index) ->
-                    NavigationBarItem(
-                        icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(22.dp)) },
-                        label = { Text(label, fontSize = 10.sp, maxLines = 1) },
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Teal,
-                            selectedTextColor = Teal,
-                            indicatorColor = Teal.copy(alpha = 0.12f),
-                            unselectedIconColor = TextMuted,
-                            unselectedTextColor = TextMuted
-                        )
-                    )
+                Spacer(modifier = Modifier.height(24.dp))
+                Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+                    Text("VG Tech", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                    Text("Panel de Supervisor", style = MaterialTheme.typography.labelMedium, color = Teal, fontWeight = FontWeight.Bold)
                 }
+                Spacer(modifier = Modifier.height(40.dp))
+                DrawerItem(Icons.Default.Dashboard, "Tablero de Control", selectedTab == "Tablero") { selectedTab = "Tablero"; scope.launch { drawerState.close() } }
+                DrawerItem(Icons.Default.Folder, "Proyectos Activos", selectedTab == "Proyectos") { selectedTab = "Proyectos"; scope.launch { drawerState.close() } }
+                DrawerItem(Icons.Default.RequestQuote, "Enviar Cotizaciones", selectedTab == "Cotizaciones") { selectedTab = "Cotizaciones"; scope.launch { drawerState.close() } }
+                DrawerItem(Icons.Default.Timeline, "Avances Semanales", selectedTab == "Avances") { selectedTab = "Avances"; scope.launch { drawerState.close() } }
+                DrawerItem(Icons.Default.Star, "Evaluar y Calificar", selectedTab == "Evaluar") { selectedTab = "Evaluar"; scope.launch { drawerState.close() } }
+                DrawerItem(Icons.Default.Assessment, "Reportes", selectedTab == "Reportes") { selectedTab = "Reportes"; scope.launch { drawerState.close() } }
+                DrawerItem(Icons.Default.Chat, "Chat", selectedTab == "Chat") { selectedTab = "Chat"; scope.launch { drawerState.close() } }
+                Spacer(modifier = Modifier.weight(1f))
+                DrawerItem(Icons.AutoMirrored.Filled.Logout, "Cerrar Sesión", false, ErrorRed) { onLogout() }
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(BackgroundLight)
-        ) {
-            when (selectedTab) {
-                0 -> DashboardTab(projects, consultants, providers)
-                1 -> ProjectsTab(projects, consultants, providers, invitations, quotations)
-                2 -> ProgressTab(projects, progressReports)
-                3 -> EvaluationsTab(projects, consultants, providers, evaluations)
-                4 -> ReportsTab(projects, consultants, providers, progressReports, evaluations)
+    ) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("Panel de Supervisor", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = SurfaceWhite) },
+                    navigationIcon = { IconButton(onClick = { scope.launch { drawerState.open() } }) { Icon(Icons.Default.Menu, "Menú", tint = SurfaceWhite) } },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Navy)
+                )
+            }
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(BackgroundLight)
+            ) {
+                when (selectedTab) {
+                    "Tablero" -> DashboardTab(projects, consultants, providers)
+                    "Proyectos" -> ProjectsTab(projects, consultants, providers, invitations, quotations)
+                    "Cotizaciones" -> SupervisorQuotationsTab(projects, providers)
+                    "Avances" -> ProgressTab(projects, progressReports)
+                    "Evaluar" -> EvaluationsTab(projects, consultants, providers, evaluations)
+                    "Reportes" -> ReportsTab(projects, consultants, providers, progressReports, evaluations)
+                    "Chat" -> SupervisorChatTab(projects, consultants, providers)
+                    else -> SupervisorPlaceholderContent(selectedTab)
+                }
             }
         }
     }
@@ -1630,5 +1612,281 @@ private fun ReportMetric(label: String, value: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = color)
         Text(label, style = MaterialTheme.typography.labelSmall, color = SurfaceWhite.copy(alpha = 0.7f))
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  DRAWER ITEM & PLACEHOLDER
+// ═════════════════════════════════════════════════════════════════
+
+@Composable
+fun DrawerItem(
+    icon: ImageVector, 
+    label: String, 
+    isSelected: Boolean, 
+    color: Color = Color.White,
+    onClick: () -> Unit
+) {
+    val background = if (isSelected) NavyItemHover else Color.Transparent
+    val tint = if (isSelected) Mustard else color
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(background)
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, tint = tint.copy(alpha = if (isSelected) 1f else 0.7f), modifier = Modifier.size(22.dp))
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = tint.copy(alpha = if (isSelected) 1f else 0.8f))
+    }
+}
+
+@Composable
+fun SupervisorPlaceholderContent(title: String) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.Construction, null, modifier = Modifier.size(64.dp), tint = TextMuted.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, color = Navy, fontWeight = FontWeight.Bold)
+            Text("Módulo en desarrollo", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  NEW TAB — Cotizaciones a Cliente
+// ═════════════════════════════════════════════════════════════════
+
+@Composable
+fun SupervisorQuotationsTab(projects: List<Project>, providers: List<Employee>) {
+    var showQuoteDialog by remember { mutableStateOf(false) }
+    var selectedProject by remember { mutableStateOf<Project?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                SectionHeader("Enviar Cotizaciones al Cliente")
+                Text("Selecciona un proyecto activo para generar y enviar la cotización de forma directa.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            val activeProjects = projects.filter { it.status == "Pendiente" || it.status == "En Progreso" }
+            if (activeProjects.isEmpty()) {
+                item {
+                    Text("No hay proyectos disponibles para cotizar.", color = TextMuted)
+                }
+            } else {
+                items(activeProjects) { project ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+                        elevation = CardDefaults.cardElevation(2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(project.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy)
+                            Text(project.description, style = MaterialTheme.typography.bodySmall, color = TextMuted, maxLines = 2)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = {
+                                    selectedProject = project
+                                    showQuoteDialog = true
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
+                            ) {
+                                Icon(Icons.Default.RequestQuote, null, modifier = Modifier.size(16.dp), tint = SurfaceWhite)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Crear y Enviar Cotización", fontSize = 12.sp, color = SurfaceWhite, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+        )
+    }
+
+    if (showQuoteDialog && selectedProject != null) {
+        SendQuotationDialog(
+            project = selectedProject!!,
+            providers = providers,
+            onDismiss = { showQuoteDialog = false },
+            onSend = { projectId, projectTitle, providerUid, providerName, amount, days, description ->
+                val newQuotation = Quotation(
+                    projectId = projectId,
+                    projectTitle = projectTitle,
+                    providerUid = providerUid,
+                    providerName = providerName,
+                    amount = amount,
+                    estimatedDays = days,
+                    description = description,
+                    sentToClient = true
+                )
+                InternalDb.addQuotation(newQuotation)
+                scope.launch { snackbarHostState.showSnackbar("✅ Cotización enviada al cliente exitosamente") }
+                showQuoteDialog = false
+            }
+        )
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  NEW TAB — Chat Organizacional
+// ═════════════════════════════════════════════════════════════════
+
+@Composable
+fun SupervisorChatTab(projects: List<Project>, consultants: List<Employee>, providers: List<Employee>) {
+    var selectedUserUid by remember { mutableStateOf<String?>(null) }
+    var selectedUserName by remember { mutableStateOf("") }
+    
+    val currentSupervisorUid = "sup-uid"
+
+    if (selectedUserUid != null) {
+        SupervisorChatDetailScreen(
+            supervisorUid = currentSupervisorUid,
+            otherUserUid = selectedUserUid!!,
+            otherUserName = selectedUserName,
+            onBack = { selectedUserUid = null }
+        )
+    } else {
+        Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+            Text("Chat Organizacional", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Navy)
+            Text("Supervisa y comunícate con consultores y proveedores de la red.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+            
+            Spacer(modifier = Modifier.height(24.dp))
+
+            val allPersonnel = consultants + providers
+
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (allPersonnel.isEmpty()) {
+                    item { Text("No hay personal disponible.", color = TextMuted) }
+                } else {
+                    items(allPersonnel) { person ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { 
+                                selectedUserUid = person.uid 
+                                selectedUserName = person.nombreCompleto
+                            },
+                            colors = CardDefaults.cardColors(containerColor = SurfaceWhite)
+                        ) {
+                            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = Navy.copy(alpha = 0.1f)) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Person, null, tint = Navy)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(person.nombreCompleto, fontWeight = FontWeight.Bold, color = Navy)
+                                    Text(person.puesto.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall, color = Teal, fontWeight = FontWeight.Bold)
+                                }
+                                Icon(Icons.Default.ChevronRight, null, tint = TextMuted)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SupervisorChatDetailScreen(supervisorUid: String, otherUserUid: String, otherUserName: String, onBack: () -> Unit) {
+    val allMessages by InternalDb.chatMessages.collectAsState()
+    val chatMessages = allMessages.filter { 
+        (it.senderUid == supervisorUid && it.receiverUid == otherUserUid) || 
+        (it.senderUid == otherUserUid && it.receiverUid == supervisorUid)
+    }.sortedBy { it.timestamp }
+
+    var messageText by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.fillMaxSize().background(SurfaceGray)) {
+        Surface(color = SurfaceWhite, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Navy) }
+                Column {
+                    Text(otherUserName, fontWeight = FontWeight.Bold, color = Navy)
+                    Text("Chat Privado", style = MaterialTheme.typography.labelSmall, color = Mustard, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(chatMessages) { msg ->
+                val isMine = msg.senderUid == supervisorUid
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = if (isMine) Alignment.CenterEnd else Alignment.CenterStart) {
+                    Surface(
+                        color = if (isMine) Navy else Color.White,
+                        shape = RoundedCornerShape(
+                            topStart = 16.dp, 
+                            topEnd = 16.dp, 
+                            bottomStart = if (isMine) 16.dp else 0.dp, 
+                            bottomEnd = if (isMine) 0.dp else 16.dp
+                        ),
+                        modifier = Modifier.widthIn(max = 280.dp)
+                    ) {
+                        Text(
+                            text = msg.message,
+                            modifier = Modifier.padding(12.dp),
+                            color = if (isMine) Color.White else Navy,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        }
+
+        Surface(color = SurfaceWhite, modifier = Modifier.imePadding()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    placeholder = { Text("Escribe un mensaje...") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    maxLines = 3
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = {
+                        if (messageText.isNotBlank()) {
+                            InternalDb.addChatMessage(ChatMessage(
+                                senderUid = supervisorUid,
+                                receiverUid = otherUserUid,
+                                projectId = "SUPERVISION",
+                                message = messageText
+                            ))
+                            messageText = ""
+                        }
+                    },
+                    colors = IconButtonDefaults.iconButtonColors(containerColor = Navy, contentColor = Color.White),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, null)
+                }
+            }
+        }
     }
 }
