@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -22,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -129,18 +131,63 @@ fun VacationHistoryScreen() {
         // ── Content ─────────────────────────────────────────────
         when (currentView) {
             0 -> {
-                // Employee list for vacation requests
+                // ── Employee table ──────────────────────────────
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(12.dp)
                 ) {
                     item {
                         Text("Selecciona un empleado para registrar vacaciones", style = MaterialTheme.typography.titleSmall, color = TextMuted)
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
+
+                    // Table header
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
+                                .background(Navy)
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Nombre", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(1.4f))
+                            Text("Puesto", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
+                            Text("Días Disp.", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(0.6f), textAlign = TextAlign.Center)
+                            Box(modifier = Modifier.width(40.dp))
+                        }
+                    }
+
+                    // Table rows
                     items(filteredEmployees) { emp ->
-                        EmployeeVacationRow(emp) { selectedEmployeeState.value = emp }
+                        val bgColor = if (filteredEmployees.indexOf(emp) % 2 == 0) SurfaceWhite else SurfaceGray
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(bgColor)
+                                .clickable { selectedEmployeeState.value = emp }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(emp.nombreCompleto, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = Navy, modifier = Modifier.weight(1.4f))
+                            Text(emp.puesto, style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center)
+                            Text(
+                                "${emp.diasVacaciones}",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (emp.diasVacaciones > 0) Teal else ErrorRed,
+                                modifier = Modifier.weight(0.6f),
+                                textAlign = TextAlign.Center
+                            )
+                            Icon(
+                                Icons.Default.ChevronRight, null,
+                                tint = TextMuted,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
                     }
+
                     if (filteredEmployees.isEmpty()) {
                         item {
                             Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
@@ -151,22 +198,174 @@ fun VacationHistoryScreen() {
                 }
             }
             1 -> {
-                // Vacation request history
+                // ── Vacation history TABLE ───────────────────────
+                val sortedRequests = requests.sortedByDescending { it.requestDate }
+                val sdf = remember { SimpleDateFormat("dd/MM/yy", Locale.getDefault()) }
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(12.dp)
                 ) {
-                    item { Text("Historial de Solicitudes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy) }
-                    items(requests.sortedByDescending { it.requestDate }) { request ->
-                        VacationRequestItem(request)
+                    item {
+                        Text("Historial de Solicitudes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy)
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
-                    if (requests.isEmpty()) {
+
+                    // Table header
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .widthIn(min = 700.dp)
+                                    .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
+                                    .background(Navy)
+                                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TableHeaderCell("Empleado", Modifier.width(130.dp))
+                                TableHeaderCell("Inicio", Modifier.width(75.dp))
+                                TableHeaderCell("Término", Modifier.width(75.dp))
+                                TableHeaderCell("Días", Modifier.width(45.dp))
+                                TableHeaderCell("½ Día", Modifier.width(45.dp))
+                                TableHeaderCell("Efectivo", Modifier.width(55.dp))
+                                TableHeaderCell("Estado", Modifier.width(85.dp))
+                                TableHeaderCell("Acciones", Modifier.width(90.dp))
+                            }
+                        }
+                    }
+
+                    if (sortedRequests.isEmpty()) {
                         item {
-                            Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().height(100.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text("No hay solicitudes registradas.", color = TextMuted)
                             }
                         }
+                    }
+
+                    // Table rows
+                    items(sortedRequests) { request ->
+                        val rowBg = if (sortedRequests.indexOf(request) % 2 == 0) SurfaceWhite else SurfaceGray
+                        val statusColor = when (request.status) {
+                            VacationStatus.PENDING -> WarningAmber
+                            VacationStatus.APPROVED -> SuccessGreen
+                            VacationStatus.REJECTED -> ErrorRed
+                        }
+                        val statusLabel = when (request.status) {
+                            VacationStatus.PENDING -> "Pendiente"
+                            VacationStatus.APPROVED -> "Aprobado"
+                            VacationStatus.REJECTED -> "Rechazado"
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .widthIn(min = 700.dp)
+                                    .background(rowBg)
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Empleado
+                                Text(
+                                    request.employeeName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Navy,
+                                    modifier = Modifier.width(130.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                // Inicio
+                                Text(
+                                    sdf.format(Date(request.startDate)),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Navy,
+                                    modifier = Modifier.width(75.dp),
+                                    textAlign = TextAlign.Center
+                                )
+                                // Término
+                                Text(
+                                    sdf.format(Date(request.endDate)),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Navy,
+                                    modifier = Modifier.width(75.dp),
+                                    textAlign = TextAlign.Center
+                                )
+                                // Días
+                                Text(
+                                    "${request.daysRequested}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Navy,
+                                    modifier = Modifier.width(45.dp),
+                                    textAlign = TextAlign.Center
+                                )
+                                // ½ Día
+                                Text(
+                                    if (request.halfDays > 0) "${request.halfDays}" else "-",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (request.halfDays > 0) MustardDark else TextMuted,
+                                    fontWeight = if (request.halfDays > 0) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier.width(45.dp),
+                                    textAlign = TextAlign.Center
+                                )
+                                // Efectivo
+                                Text(
+                                    "${request.effectiveDays}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Teal,
+                                    modifier = Modifier.width(55.dp),
+                                    textAlign = TextAlign.Center
+                                )
+                                // Estado chip
+                                Box(modifier = Modifier.width(85.dp), contentAlignment = Alignment.Center) {
+                                    Surface(
+                                        color = statusColor.copy(alpha = 0.12f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            statusLabel,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = statusColor,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                                // Acciones
+                                Row(modifier = Modifier.width(90.dp), horizontalArrangement = Arrangement.Center) {
+                                    if (request.status == VacationStatus.PENDING) {
+                                        IconButton(
+                                            onClick = { InternalDb.updateVacationStatus(request.id, VacationStatus.REJECTED) },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, null, tint = ErrorRed, modifier = Modifier.size(16.dp))
+                                        }
+                                        IconButton(
+                                            onClick = { InternalDb.updateVacationStatus(request.id, VacationStatus.APPROVED) },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(Icons.Default.Check, null, tint = SuccessGreen, modifier = Modifier.size(16.dp))
+                                        }
+                                    } else {
+                                        Text("—", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+                        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
                     }
                 }
             }
@@ -806,4 +1005,17 @@ fun showDatePicker(context: android.content.Context, initialDate: Long, onDateSe
         calendar.get(Calendar.MONTH),
         calendar.get(Calendar.DAY_OF_MONTH)
     ).show()
+}
+
+@Composable
+private fun TableHeaderCell(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = Color.White,
+        modifier = modifier,
+        textAlign = TextAlign.Center,
+        fontSize = 10.sp
+    )
 }
