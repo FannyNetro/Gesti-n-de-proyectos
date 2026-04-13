@@ -25,6 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import com.vgtech.mobile.data.local.InternalDb
 import com.vgtech.mobile.data.model.*
 import com.vgtech.mobile.ui.theme.*
@@ -264,6 +266,7 @@ private fun ProjectsTab(
     var expandedProjectId by remember { mutableStateOf<String?>(null) }
     var showAssignDialog by remember { mutableStateOf(false) }
     var showInviteDialog by remember { mutableStateOf(false) }
+    var showQuoteDialog by remember { mutableStateOf(false) }
     var selectedProject by remember { mutableStateOf<Project?>(null) }
     var snackMessage by remember { mutableStateOf<String?>(null) }
 
@@ -434,6 +437,21 @@ private fun ProjectsTab(
                                     Text("Invitar Prov.", fontSize = 11.sp)
                                 }
                             }
+                            // HU7 — Send quotation to client
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    selectedProject = project
+                                    showQuoteDialog = true
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Navy)
+                            ) {
+                                Icon(Icons.Default.RequestQuote, null, modifier = Modifier.size(16.dp), tint = SurfaceWhite)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Crear Cotización y Enviar al Cliente", fontSize = 12.sp, color = SurfaceWhite)
+                            }
                         }
                     }
                 }
@@ -482,6 +500,30 @@ private fun ProjectsTab(
                 )
                 snackMessage = "Invitación enviada a $provName"
                 showInviteDialog = false
+            }
+        )
+    }
+
+    // ── Send Quotation to Client Dialog (HU7) ─────────────────────────────
+    if (showQuoteDialog && selectedProject != null) {
+        SendQuotationDialog(
+            project = selectedProject!!,
+            providers = providers,
+            onDismiss = { showQuoteDialog = false },
+            onSend = { projectId, projectTitle, providerUid, providerName, amount, days, description ->
+                val newQuotation = Quotation(
+                    projectId = projectId,
+                    projectTitle = projectTitle,
+                    providerUid = providerUid,
+                    providerName = providerName,
+                    amount = amount,
+                    estimatedDays = days,
+                    description = description,
+                    sentToClient = true
+                )
+                InternalDb.addQuotation(newQuotation)
+                snackMessage = "✅ Cotización enviada al cliente correctamente"
+                showQuoteDialog = false
             }
         )
     }
@@ -1065,6 +1107,152 @@ private fun InviteProviderDialog(
                 enabled = selectedProvider.isNotBlank()
             ) {
                 Text("Enviar Invitación")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SendQuotationDialog(
+    project: Project,
+    providers: List<Employee>,
+    onDismiss: () -> Unit,
+    onSend: (String, String, String, String, Double, Int, String) -> Unit
+) {
+    var selectedProvider by remember { mutableStateOf(project.providerUid ?: "") }
+    var amount by remember { mutableStateOf("") }
+    var days by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text("Nueva Cotización al Cliente", fontWeight = FontWeight.Bold, color = Navy)
+                Text(
+                    project.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                // Provider
+                Text("Proveedor", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Navy)
+                ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                    OutlinedTextField(
+                        value = providers.find { it.uid == selectedProvider }?.nombreCompleto ?: "Seleccionar...",
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        providers.forEach { p ->
+                            DropdownMenuItem(
+                                text = { Text(p.nombreCompleto) },
+                                onClick = {
+                                    selectedProvider = p.uid
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Amount
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text("Monto total (MXN)") },
+                    leadingIcon = { Icon(Icons.Default.AttachMoney, null, tint = TextMuted, modifier = Modifier.size(18.dp)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Days
+                OutlinedTextField(
+                    value = days,
+                    onValueChange = { days = it.filter { c -> c.isDigit() } },
+                    label = { Text("Días estimados") },
+                    leadingIcon = { Icon(Icons.Default.CalendarToday, null, tint = TextMuted, modifier = Modifier.size(18.dp)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Description
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Descripción / Condiciones") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    minLines = 2
+                )
+
+                // NOTICE
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    color = Teal.copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(Icons.Default.Info, null, tint = Teal, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Esta cotización será enviada directamente al portal del cliente para su autorización.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Teal
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            val isValid = selectedProvider.isNotBlank() && amount.isNotBlank() && days.isNotBlank()
+            Button(
+                onClick = {
+                    if (isValid) {
+                        val provName = providers.find { it.uid == selectedProvider }?.nombreCompleto ?: ""
+                        onSend(
+                            project.id,
+                            project.title,
+                            selectedProvider,
+                            provName,
+                            amount.toDoubleOrNull() ?: 0.0,
+                            days.toIntOrNull() ?: 0,
+                            description
+                        )
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Navy),
+                shape = RoundedCornerShape(10.dp),
+                enabled = isValid
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Enviar al Cliente")
             }
         },
         dismissButton = {
