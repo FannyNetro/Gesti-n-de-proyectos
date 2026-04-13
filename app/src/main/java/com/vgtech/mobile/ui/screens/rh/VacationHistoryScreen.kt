@@ -1,6 +1,7 @@
 package com.vgtech.mobile.ui.screens.rh
 
 import android.app.DatePickerDialog
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,30 +17,39 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.vgtech.mobile.data.local.InternalDb
 import com.vgtech.mobile.data.model.Employee
 import com.vgtech.mobile.data.model.VacationRequest
 import com.vgtech.mobile.data.model.VacationStatus
+import com.vgtech.mobile.data.model.WorkLog
 import com.vgtech.mobile.ui.theme.*
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
+
+// ═══════════════════════════════════════════════════════════════════
+//  VacationHistoryScreen — Vacaciones + Horas Extras + Nómina
+// ═══════════════════════════════════════════════════════════════════
 
 @Composable
 fun VacationHistoryScreen() {
     val employees by InternalDb.employees.collectAsState()
     val requests by InternalDb.vacationRequests.collectAsState()
+    val workLogs by InternalDb.workLogs.collectAsState()
     
     var searchQuery by remember { mutableStateOf("") }
     val selectedEmployeeState = remember { mutableStateOf<Employee?>(null) }
-    var showHistory by remember { mutableStateOf(false) }
+    var currentView by remember { mutableIntStateOf(0) } // 0=Empleados, 1=Historial, 2=Nómina
 
     val filteredEmployees = remember(searchQuery, employees) {
         employees.filter { 
@@ -50,7 +60,7 @@ fun VacationHistoryScreen() {
     }
 
     Column(modifier = Modifier.fillMaxSize().background(SurfaceWhite)) {
-        // --- Header ---
+        // ── Header ──────────────────────────────────────────────
         Surface(
             color = Navy,
             modifier = Modifier.fillMaxWidth(),
@@ -63,21 +73,37 @@ fun VacationHistoryScreen() {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        "Vacaciones",
+                        "Vacaciones y Nómina",
                         style = MaterialTheme.typography.headlineSmall,
                         color = Color.White,
                         fontWeight = FontWeight.Bold
                     )
-                    IconButton(onClick = { showHistory = !showHistory }) {
-                        Icon(
-                            if (showHistory) Icons.Default.People else Icons.Default.History,
-                            contentDescription = "Alternar Vista",
-                            tint = Color.White
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Tab selector
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Empleados", "Historial", "Nómina").forEachIndexed { index, label ->
+                        FilterChip(
+                            selected = currentView == index,
+                            onClick = { currentView = index },
+                            label = { Text(label, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Teal,
+                                selectedLabelColor = Color.White,
+                                containerColor = Color.White.copy(alpha = 0.1f),
+                                labelColor = Color.White.copy(alpha = 0.7f)
+                            ),
+                            shape = RoundedCornerShape(20.dp)
                         )
                     }
                 }
                 
-                if (!showHistory) {
+                if (currentView == 0) {
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = searchQuery,
@@ -100,56 +126,76 @@ fun VacationHistoryScreen() {
             }
         }
 
-        if (showHistory) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item { Text("Historial de Solicitudes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy) }
-                items(requests.sortedByDescending { it.requestDate }) { request ->
-                    VacationRequestItem(request)
-                }
-                if (requests.isEmpty()) {
+        // ── Content ─────────────────────────────────────────────
+        when (currentView) {
+            0 -> {
+                // Employee list for vacation requests
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     item {
-                        Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No hay solicitudes registradas.", color = TextMuted)
+                        Text("Selecciona un empleado para registrar vacaciones", style = MaterialTheme.typography.titleSmall, color = TextMuted)
+                    }
+                    items(filteredEmployees) { emp ->
+                        EmployeeVacationRow(emp) { selectedEmployeeState.value = emp }
+                    }
+                    if (filteredEmployees.isEmpty()) {
+                        item {
+                            Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("No se encontraron empleados.", color = TextMuted)
+                            }
                         }
                     }
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item { Text("Selecciona un empleado para registrar vacaciones", style = MaterialTheme.typography.titleSmall, color = TextMuted) }
-                items(filteredEmployees) { emp ->
-                    EmployeeVacationRow(emp) { selectedEmployeeState.value = emp }
-                }
-                if (filteredEmployees.isEmpty()) {
-                    item {
-                        Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No se encontraron empleados.", color = TextMuted)
+            1 -> {
+                // Vacation request history
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    item { Text("Historial de Solicitudes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy) }
+                    items(requests.sortedByDescending { it.requestDate }) { request ->
+                        VacationRequestItem(request)
+                    }
+                    if (requests.isEmpty()) {
+                        item {
+                            Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("No hay solicitudes registradas.", color = TextMuted)
+                            }
                         }
                     }
                 }
+            }
+            2 -> {
+                // Payroll / Nómina
+                PayrollView(employees = filteredEmployees, workLogs = workLogs, requests = requests)
             }
         }
     }
 
+    // ── Add Vacation Dialog ──────────────────────────────────────
     selectedEmployeeState.value?.let { employee ->
         AddVacationDialog(
             employee = employee,
             onDismiss = { selectedEmployeeState.value = null },
             onConfirm = { request ->
                 InternalDb.addVacationRequest(request)
+                // Descontar días de vacaciones del empleado
+                val newDays = (employee.diasVacaciones - request.daysRequested).coerceAtLeast(0)
+                InternalDb.updateEmployee(employee.copy(diasVacaciones = newDays))
                 selectedEmployeeState.value = null
             }
         )
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  Employee Row
+// ═══════════════════════════════════════════════════════════════════
 
 @Composable
 fun EmployeeVacationRow(employee: Employee, onClick: () -> Unit) {
@@ -178,6 +224,10 @@ fun EmployeeVacationRow(employee: Employee, onClick: () -> Unit) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  Vacation Request Item (with half-day info)
+// ═══════════════════════════════════════════════════════════════════
+
 @Composable
 fun VacationRequestItem(request: VacationRequest) {
     val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
@@ -197,11 +247,40 @@ fun VacationRequestItem(request: VacationRequest) {
                 Text(request.employeeName, fontWeight = FontWeight.Bold, color = Navy)
                 Text("Solicitado: ${sdf.format(Date(request.requestDate))}", style = MaterialTheme.typography.bodySmall, color = TextMuted)
                 Text("${sdf.format(Date(request.startDate))} al ${sdf.format(Date(request.endDate))}", style = MaterialTheme.typography.bodySmall, color = Navy)
-                Text("Total: ${request.daysRequested} días", fontWeight = FontWeight.Bold, color = Teal)
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Total: ", style = MaterialTheme.typography.bodySmall, color = Navy)
+                    Text("${request.effectiveDays}", fontWeight = FontWeight.Bold, color = Teal)
+                    Text(" días", style = MaterialTheme.typography.bodySmall, color = Navy)
+                    if (request.halfDays > 0) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Surface(
+                            color = Mustard.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                " ${request.halfDays} medio día${if (request.halfDays > 1) "s" else ""} ",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MustardDark,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
                 Surface(color = color.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
-                    Text(request.status.name, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.Bold)
+                    Text(
+                        when (request.status) {
+                            VacationStatus.PENDING -> "PENDIENTE"
+                            VacationStatus.APPROVED -> "APROBADO"
+                            VacationStatus.REJECTED -> "RECHAZADO"
+                        },
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = color,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
                 if (request.status == VacationStatus.PENDING) {
                     Row {
@@ -214,26 +293,66 @@ fun VacationRequestItem(request: VacationRequest) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//  Add Vacation Dialog — Fixed consecutive days + half-day support
+// ═══════════════════════════════════════════════════════════════════
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (VacationRequest) -> Unit) {
     var startDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var endDate by remember { mutableLongStateOf(System.currentTimeMillis() + 86400000L) }
+    var isHalfDayStart by remember { mutableStateOf(false) }
+    var isHalfDayEnd by remember { mutableStateOf(false) }
     
+    // Horas extras
+    var overtimeHours by remember { mutableStateOf("") }
+    var overtimeRate by remember { mutableStateOf("200") } // porcentaje
+
     val context = LocalContext.current
     val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
-    // Cálculo automático de días
-    val diff = endDate - startDate
-    val daysRequested = if (diff >= 0) (TimeUnit.MILLISECONDS.toDays(diff).toInt() + 1) else 0
+    // ── Fixed: consecutive business days calculation ──────────
+    val totalCalendarDays = remember(startDate, endDate) {
+        if (endDate >= startDate) {
+            val cal = Calendar.getInstance()
+            cal.timeInMillis = startDate
+            val endCal = Calendar.getInstance()
+            endCal.timeInMillis = endDate
+            
+            var count = 0
+            while (!cal.after(endCal)) {
+                val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
+                // Contar solo días laborales (lunes a viernes)
+                if (dayOfWeek != Calendar.SATURDAY && dayOfWeek != Calendar.SUNDAY) {
+                    count++
+                }
+                cal.add(Calendar.DAY_OF_MONTH, 1)
+            }
+            count
+        } else 0
+    }
 
-    // Datos del saldo
+    // Half day adjustments
+    val halfDayCount = (if (isHalfDayStart) 1 else 0) + (if (isHalfDayEnd) 1 else 0)
+    val effectiveDays = totalCalendarDays.toDouble() - (halfDayCount * 0.5)
+    val effectiveHours = effectiveDays * 8.0
+
+    // Overtime
+    val overtimeHoursVal = overtimeHours.toDoubleOrNull() ?: 0.0
+    val overtimeMultiplier = (overtimeRate.toDoubleOrNull() ?: 200.0) / 100.0
+    val hourlyRate = employee.pagoPorHora
+    val overtimePay = overtimeHoursVal * hourlyRate * overtimeMultiplier
+
+    // Vacation balance
     val pendActual = employee.diasVacaciones
     val pendAnteriores = 0 
     val totalDispPend = pendActual + pendAnteriores
-    val finalDisponibles = (totalDispPend - daysRequested).coerceAtLeast(0)
+    val finalDisponibles = (totalDispPend - totalCalendarDays).coerceAtLeast(0)
     
-    val canRegister = daysRequested in 1..totalDispPend
+    val canRegister = totalCalendarDays in 1..totalDispPend
+
+    val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -246,9 +365,12 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
-                modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // Header
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Column(horizontalAlignment = Alignment.End) {
                         Text("Fecha de solicitud:", style = MaterialTheme.typography.labelSmall, color = TextMuted)
@@ -256,8 +378,16 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
                     }
                 }
 
-                Text("Solicitud de Vacaciones", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Navy, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                Text(
+                    "Solicitud de Vacaciones",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Navy,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
+                // Employee info
                 Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     FormLabelValue("Nombre:", employee.nombreCompleto.uppercase())
                     Row(modifier = Modifier.fillMaxWidth()) {
@@ -268,68 +398,347 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
 
                 HorizontalDivider(thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.5f))
 
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // ── Dates ────────────────────────────────────────
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Start date row
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Fecha inició de Vacaciones:", style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(180.dp))
+                        Text("Fecha inicio:", style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(100.dp))
                         DatePickerBox(sdf.format(Date(startDate))) { showDatePicker(context, startDate) { startDate = it } }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        FilterChip(
+                            selected = isHalfDayStart,
+                            onClick = { isHalfDayStart = !isHalfDayStart },
+                            label = { Text("½ día", fontSize = 11.sp) },
+                            leadingIcon = if (isHalfDayStart) {{ Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp)) }} else null,
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Mustard.copy(alpha = 0.2f),
+                                selectedLabelColor = MustardDark
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        )
                     }
+
+                    // End date row  
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Fecha termino de Vacaciones:", style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(180.dp))
+                        Text("Fecha término:", style = MaterialTheme.typography.bodySmall, modifier = Modifier.width(100.dp))
                         DatePickerBox(sdf.format(Date(endDate))) { showDatePicker(context, endDate) { endDate = it } }
-                        
-                        Spacer(modifier = Modifier.width(16.dp))
-                        
-                        Box(
-                            modifier = Modifier
-                                .border(1.5.dp, ErrorRed, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Total días", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("$daysRequested", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = ErrorRed)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        FilterChip(
+                            selected = isHalfDayEnd,
+                            onClick = { isHalfDayEnd = !isHalfDayEnd },
+                            label = { Text("½ día", fontSize = 11.sp) },
+                            leadingIcon = if (isHalfDayEnd) {{ Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp)) }} else null,
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Mustard.copy(alpha = 0.2f),
+                                selectedLabelColor = MustardDark
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
+                }
+
+                // ── Total days/hours summary ─────────────────────
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = TealLight.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Column {
+                                Text("Días laborales", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                                Text("$totalCalendarDays", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Navy)
+                            }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Días efectivos", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                                Text("$effectiveDays", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Teal)
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("Horas", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                                Text("${effectiveHours.toInt()}h", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Mustard)
+                            }
+                        }
+                        if (halfDayCount > 0) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Incluye $halfDayCount medio día${if (halfDayCount > 1) "s" else ""}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MustardDark,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                // ── Vacation balance ─────────────────────────────
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    CalculationLine("Días pendientes del periodo actual:", "$pendActual")
+                    CalculationLine("Días pendientes de periodos anteriores:", "$pendAnteriores")
+                    CalculationLine("Total vacaciones disponibles:", "$totalDispPend", isBold = true, isGray = true)
+                    CalculationLine("Días solicitados:", "$totalCalendarDays", isGray = true)
+                    CalculationLine("Días disponibles después:", "$finalDisponibles", isBold = true, isGray = true, textColor = if (finalDisponibles > 0) Teal else ErrorRed)
+                }
+
+                if (totalCalendarDays > totalDispPend) {
+                    Text("⚠️ Saldo insuficiente de días de vacaciones.", color = ErrorRed, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                }
+
+                HorizontalDivider(thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.5f))
+
+                // ── Overtime section ─────────────────────────────
+                Text("Horas Extras", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Navy)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = overtimeHours,
+                        onValueChange = { if (it.isEmpty() || it.toDoubleOrNull() != null) overtimeHours = it },
+                        label = { Text("Horas extras") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.Schedule, null, tint = Mustard, modifier = Modifier.size(18.dp)) }
+                    )
+                    OutlinedTextField(
+                        value = overtimeRate,
+                        onValueChange = { if (it.isEmpty() || it.toDoubleOrNull() != null) overtimeRate = it },
+                        label = { Text("Tasa %") },
+                        modifier = Modifier.width(100.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true,
+                        suffix = { Text("%") }
+                    )
+                }
+
+                if (overtimeHoursVal > 0) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Mustard.copy(alpha = 0.1f)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Tarifa por hora:", style = MaterialTheme.typography.bodySmall, color = Navy)
+                                Text(currencyFormatter.format(hourlyRate), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Navy)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Horas extra × ${overtimeRate}%:", style = MaterialTheme.typography.bodySmall, color = Navy)
+                                Text("${overtimeHoursVal}h × ${currencyFormatter.format(hourlyRate)} × $overtimeMultiplier", style = MaterialTheme.typography.bodySmall, color = Navy)
+                            }
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Pago horas extras:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MustardDark)
+                                Text(currencyFormatter.format(overtimePay), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.ExtraBold, color = MustardDark)
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CalculationLine("Días de Vacaciones pendientes de disfrutar del periodo actual:", "$pendActual")
-                    CalculationLine("Días de Vacaciones pendientes de disfrutar de periodos anteriores:", "$pendAnteriores")
-                    CalculationLine("Total de Vacaciones disponibles pendientes de disfrutar:", "$totalDispPend", isBold = true, isGray = true)
-                    CalculationLine("Días de Vacaciones que solicita:", "$daysRequested", isGray = true)
-                    CalculationLine("Días de Vacaciones disponibles:", "$finalDisponibles", isBold = true, isGray = true, textColor = Teal)
-                }
-
-                if (daysRequested > totalDispPend) {
-                    Text("⚠️ Saldo insuficiente.", color = ErrorRed, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancelar", color = Navy, fontWeight = FontWeight.Bold) }
+                // ── Action buttons ───────────────────────────────
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                        Text("Cancelar", color = Navy, fontWeight = FontWeight.Bold)
+                    }
                     Button(
                         onClick = {
-                            onConfirm(VacationRequest(
+                            // Register vacation request
+                            val request = VacationRequest(
                                 employeeUid = employee.uid,
                                 employeeName = employee.nombreCompleto,
                                 startDate = startDate,
                                 endDate = endDate,
-                                daysRequested = daysRequested
-                            ))
+                                daysRequested = totalCalendarDays,
+                                halfDays = halfDayCount,
+                                isHalfDayStart = isHalfDayStart,
+                                isHalfDayEnd = isHalfDayEnd
+                            )
+                            onConfirm(request)
+
+                            // Also register overtime as a work log if hours exist
+                            if (overtimeHoursVal > 0) {
+                                InternalDb.addWorkLog(WorkLog(
+                                    employeeUid = employee.uid,
+                                    employeeName = employee.nombreCompleto,
+                                    hoursWorked = 0.0,
+                                    overtimeHours = overtimeHoursVal,
+                                    overtimeRate = overtimeMultiplier,
+                                    hourlyRateAtTime = hourlyRate,
+                                    observations = "Horas extras - Periodo vacacional"
+                                ))
+                            }
                         },
                         enabled = canRegister,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = Teal),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("Registrar")
+                        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Procesar")
                     }
                 }
             }
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Payroll / Nómina View  (HU: Generar la nómina)
+// ═══════════════════════════════════════════════════════════════════
+
+@Composable
+private fun PayrollView(
+    employees: List<Employee>,
+    workLogs: List<WorkLog>,
+    requests: List<VacationRequest>
+) {
+    val currencyFormatter = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text("Nómina Generada", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy)
+            Text("Resumen de sueldos, horas extras y deducciones", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        val activeEmployees = employees.filter { it.activo && it.puesto != "Proveedor" && it.puesto != "Cliente" }
+
+        items(activeEmployees) { emp ->
+            val empLogs = workLogs.filter { it.employeeUid == emp.uid }
+            val empVacations = requests.filter { it.employeeUid == emp.uid && it.status == VacationStatus.APPROVED }
+            
+            val totalRegularHours = empLogs.sumOf { it.hoursWorked }
+            val totalOvertimeHours = empLogs.sumOf { it.overtimeHours }
+            val totalOvertimePay = empLogs.sumOf { it.overtimeHours * it.hourlyRateAtTime * it.overtimeRate }
+            val regularPay = emp.sueldo
+            val totalPay = regularPay + totalOvertimePay
+            val vacDaysTaken = empVacations.sumOf { it.daysRequested }
+
+            var expanded by remember { mutableStateOf(false) }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .animateContentSize()
+                    .clickable { expanded = !expanded },
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(2.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(10.dp), color = TealLight.copy(alpha = 0.3f)) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(emp.nombreCompleto.take(1), fontWeight = FontWeight.Bold, color = Teal)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(emp.nombreCompleto, fontWeight = FontWeight.Bold, color = Navy)
+                            Text(emp.puesto, style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(currencyFormatter.format(totalPay), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = Teal)
+                            Text("Total nómina", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        }
+                    }
+
+                    if (expanded) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = BorderColor)
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        PayrollLine("Sueldo base mensual", currencyFormatter.format(regularPay))
+                        PayrollLine("Pago por hora", "${currencyFormatter.format(emp.pagoPorHora)}/h")
+                        PayrollLine("Horas regulares registradas", "${totalRegularHours}h")
+                        
+                        if (totalOvertimeHours > 0) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Mustard.copy(alpha = 0.1f))
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text("Horas extras", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MustardDark)
+                                    Text("${totalOvertimeHours}h", style = MaterialTheme.typography.bodySmall, color = Navy)
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("Pago extras", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                                    Text(currencyFormatter.format(totalOvertimePay), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.ExtraBold, color = MustardDark)
+                                }
+                            }
+                        }
+
+                        PayrollLine("Días vacaciones tomados", "$vacDaysTaken días")
+                        PayrollLine("Días vacaciones disponibles", "${emp.diasVacaciones} días")
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = BorderColor)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("TOTAL NÓMINA", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = Navy)
+                            Text(currencyFormatter.format(totalPay), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = Teal)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Grand total
+        item {
+            val grandTotal = activeEmployees.sumOf { emp ->
+                val overtimePay = workLogs.filter { it.employeeUid == emp.uid }.sumOf { it.overtimeHours * it.hourlyRateAtTime * it.overtimeRate }
+                emp.sueldo + overtimePay
+            }
+            
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Navy),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(20.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Total Nómina General", style = MaterialTheme.typography.titleSmall, color = SurfaceWhite.copy(alpha = 0.7f))
+                        Text("${activeEmployees.size} empleado(s)", style = MaterialTheme.typography.labelSmall, color = SurfaceWhite.copy(alpha = 0.5f))
+                    }
+                    Text(currencyFormatter.format(grandTotal), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Teal)
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Shared Composables
+// ═══════════════════════════════════════════════════════════════════
+
+@Composable
+private fun PayrollLine(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = TextMuted)
+        Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = Navy)
     }
 }
 
@@ -349,7 +758,7 @@ fun FormLabelValue(label: String, value: String) {
 fun DatePickerBox(dateText: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .width(150.dp)
+            .width(130.dp)
             .border(1.dp, Color.Gray, RoundedCornerShape(4.dp))
             .clickable { onClick() }
             .padding(vertical = 8.dp, horizontal = 12.dp),

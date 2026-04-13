@@ -28,17 +28,35 @@ object InternalDb {
     private val _chatMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
 
+    // ── Supervisor-specific stores ────────────────────────────────
+    private val _invitations = MutableStateFlow<List<ProviderInvitation>>(emptyList())
+    val invitations: StateFlow<List<ProviderInvitation>> = _invitations.asStateFlow()
+
+    private val _quotations = MutableStateFlow<List<Quotation>>(emptyList())
+    val quotations: StateFlow<List<Quotation>> = _quotations.asStateFlow()
+
+    private val _evaluations = MutableStateFlow<List<PerformanceEvaluation>>(emptyList())
+    val evaluations: StateFlow<List<PerformanceEvaluation>> = _evaluations.asStateFlow()
+
     init {
         val currentConsultantUid = "consultor-uid"
         val provUid = "prov-uid"
 
+        // ── Expanded seed users ──────────────────────────────────
         val generatedUsers = mutableListOf<Employee>()
         generatedUsers.add(Employee(uid = "admin-uid", nombreCompleto = "Admin RH User", email = "admin@vgtech.com", puesto = "RH", password = "admin", activo = true))
-        generatedUsers.add(Employee(uid = provUid, nombreCompleto = "Proveedor General", email = "proveedor@vgtech.com", puesto = "Proveedor", password = "prov", activo = true))
+        generatedUsers.add(Employee(uid = "sup-uid", nombreCompleto = "Carlos Mendoza", email = "supervisor@vgtech.com", puesto = "Supervisor", password = "super", activo = true))
+        generatedUsers.add(Employee(uid = provUid, nombreCompleto = "Proveedor General", email = "proveedor@vgtech.com", puesto = "Proveedor", password = "prov", activo = true, tipoTrabajo = listOf("Instalaciones", "Obra Civil")))
+        generatedUsers.add(Employee(uid = "prov-2", nombreCompleto = "Materiales del Norte", email = "norte@vgtech.com", puesto = "Proveedor", password = "prov2", activo = true, tipoTrabajo = listOf("Materiales", "Acabados")))
+        generatedUsers.add(Employee(uid = "prov-3", nombreCompleto = "Electro Servicios MX", email = "electro@vgtech.com", puesto = "Proveedor", password = "prov3", activo = true, tipoTrabajo = listOf("Eléctrico", "Iluminación")))
         generatedUsers.add(Employee(uid = currentConsultantUid, nombreCompleto = "Consultor Externo", email = "consultor@vgtech.com", puesto = "Consultor", password = "cons", activo = true))
+        generatedUsers.add(Employee(uid = "cons-2", nombreCompleto = "Ana García López", email = "ana@vgtech.com", puesto = "Consultor", password = "cons2", activo = true))
+        generatedUsers.add(Employee(uid = "cons-3", nombreCompleto = "Roberto Díaz Martín", email = "roberto@vgtech.com", puesto = "Consultor", password = "cons3", activo = true))
+        generatedUsers.add(Employee(uid = "cliente-uid", nombreCompleto = "Cliente Corporativo", email = "cliente@vgtech.com", puesto = "Cliente", password = "cli", activo = true))
 
         _employees.value = generatedUsers
 
+        // ── Expanded seed projects ───────────────────────────────
         _projects.value = listOf(
             Project(
                 id = "proj-101",
@@ -47,6 +65,7 @@ object InternalDb {
                 consultantUid = currentConsultantUid,
                 providerUid = provUid,
                 providerName = "Proveedor General",
+                supervisorUid = "sup-uid",
                 progress = 1.0f,
                 status = "Finalizado",
                 comments = "Excelente coordinación en la primera etapa. El proveedor cumplió con los estándares de seguridad.",
@@ -62,6 +81,7 @@ object InternalDb {
                 consultantUid = currentConsultantUid,
                 providerUid = provUid,
                 providerName = "Proveedor General",
+                supervisorUid = "sup-uid",
                 progress = 1.0f,
                 status = "Finalizado",
                 comments = "Hubo problemas con el suministro de concreto, pero se resolvió.",
@@ -78,6 +98,7 @@ object InternalDb {
                 consultantUid = currentConsultantUid,
                 providerUid = provUid,
                 providerName = "Proveedor General",
+                supervisorUid = "sup-uid",
                 progress = 0.85f,
                 status = "En Progreso"
             ),
@@ -85,10 +106,46 @@ object InternalDb {
                 id = "proj-2",
                 title = "Residencial Las Lomas",
                 description = "Estructura principal.",
-                consultantUid = currentConsultantUid,
+                consultantUid = "cons-2",
                 providerUid = provUid,
                 providerName = "Proveedor General",
+                supervisorUid = "sup-uid",
                 progress = 0.50f,
+                status = "En Progreso"
+            ),
+            Project(
+                id = "proj-3",
+                title = "Torre Corporativa Alfa",
+                description = "Diseño y supervisión de obra.",
+                consultantUid = "cons-3",
+                providerUid = "prov-2",
+                providerName = "Materiales del Norte",
+                supervisorUid = "sup-uid",
+                progress = 0.30f,
+                status = "En Progreso",
+                hasDelays = true,
+                delayReason = "Retraso en permisos municipales."
+            ),
+            Project(
+                id = "proj-4",
+                title = "Plaza Comercial Sur",
+                description = "Instalaciones eléctricas y acabados.",
+                consultantUid = null,
+                providerUid = null,
+                providerName = "",
+                supervisorUid = "sup-uid",
+                progress = 0f,
+                status = "Pendiente"
+            ),
+            Project(
+                id = "proj-5",
+                title = "Parque Industrial Oriente",
+                description = "Cimentación y estructura metálica.",
+                consultantUid = "cons-2",
+                providerUid = "prov-3",
+                providerName = "Electro Servicios MX",
+                supervisorUid = "sup-uid",
+                progress = 0.15f,
                 status = "En Progreso"
             )
         )
@@ -105,7 +162,8 @@ object InternalDb {
                 description = "Instalación de tuberías de cobre completada al 90%.",
                 reportType = "Diario",
                 highlights = "Material de alta calidad.",
-                issues = "Poca ventilación en el área."
+                issues = "Poca ventilación en el área.",
+                date = System.currentTimeMillis() - 86_400_000 // 1 day ago
             ),
             ProjectProgress(
                 id = "report-2",
@@ -117,7 +175,81 @@ object InternalDb {
                 description = "Colado de losa de entrepiso.",
                 reportType = "Semanal",
                 highlights = "Buen tiempo de ejecución.",
-                issues = ""
+                issues = "",
+                date = System.currentTimeMillis() - 172_800_000 // 2 days ago
+            ),
+            ProjectProgress(
+                id = "report-3",
+                projectId = "proj-3",
+                projectTitle = "Torre Corporativa Alfa",
+                providerUid = "prov-2",
+                providerName = "Materiales del Norte",
+                progressPercentage = 30,
+                description = "Excavación y preparación de terreno.",
+                reportType = "Semanal",
+                highlights = "Terreno estable.",
+                issues = "Retraso por permisos.",
+                delayReason = "Permisos municipales pendientes.",
+                date = System.currentTimeMillis() - 259_200_000 // 3 days ago
+            ),
+            ProjectProgress(
+                id = "report-4",
+                projectId = "proj-5",
+                projectTitle = "Parque Industrial Oriente",
+                providerUid = "prov-3",
+                providerName = "Electro Servicios MX",
+                progressPercentage = 15,
+                description = "Tendido de cableado principal.",
+                reportType = "Diario",
+                highlights = "Materiales de primera.",
+                issues = "",
+                date = System.currentTimeMillis() - 43_200_000 // 12 hours ago
+            )
+        )
+
+        // ── Seed invitations ─────────────────────────────────────
+        _invitations.value = listOf(
+            ProviderInvitation(
+                id = "inv-1",
+                projectId = "proj-4",
+                projectTitle = "Plaza Comercial Sur",
+                providerUid = "prov-3",
+                providerName = "Electro Servicios MX",
+                supervisorUid = "sup-uid",
+                message = "Invitación para cotizar instalaciones eléctricas.",
+                status = "Cotizada"
+            )
+        )
+
+        // ── Seed quotations ──────────────────────────────────────
+        _quotations.value = listOf(
+            Quotation(
+                id = "quot-1",
+                invitationId = "inv-1",
+                projectId = "proj-4",
+                projectTitle = "Plaza Comercial Sur",
+                providerUid = "prov-3",
+                providerName = "Electro Servicios MX",
+                amount = 450_000.0,
+                estimatedDays = 45,
+                description = "Incluye cableado, tableros y luminarias LED."
+            )
+        )
+
+        // ── Seed evaluations ─────────────────────────────────────
+        _evaluations.value = listOf(
+            PerformanceEvaluation(
+                id = "eval-1",
+                evaluatedUid = currentConsultantUid,
+                evaluatedName = "Consultor Externo",
+                evaluatedRole = "Consultor",
+                projectId = "proj-101",
+                projectTitle = "Hospital General - Fase 1",
+                qualityRating = 5f,
+                timelinessRating = 5f,
+                communicationRating = 4.5f,
+                overallRating = 4.8f,
+                comments = "Excelente desempeño."
             )
         )
     }
@@ -273,4 +405,84 @@ object InternalDb {
         currentList.add(message)
         _chatMessages.value = currentList
     }
+
+    // ── Supervisor CRUD functions ─────────────────────────────────
+
+    fun addProject(project: Project) {
+        val currentList = _projects.value.toMutableList()
+        currentList.add(project)
+        _projects.value = currentList
+    }
+
+    fun updateProject(project: Project) {
+        val currentList = _projects.value.toMutableList()
+        val index = currentList.indexOfFirst { it.id == project.id }
+        if (index != -1) {
+            currentList[index] = project
+            _projects.value = currentList
+        }
+    }
+
+    fun assignConsultantToProject(projectId: String, consultantUid: String) {
+        val currentProjects = _projects.value.toMutableList()
+        val index = currentProjects.indexOfFirst { it.id == projectId }
+        if (index != -1) {
+            val old = currentProjects[index]
+            currentProjects[index] = old.copy(consultantUid = consultantUid)
+            _projects.value = currentProjects
+        }
+    }
+
+    fun assignProviderToProject(projectId: String, providerUid: String, providerName: String) {
+        val currentProjects = _projects.value.toMutableList()
+        val index = currentProjects.indexOfFirst { it.id == projectId }
+        if (index != -1) {
+            val old = currentProjects[index]
+            currentProjects[index] = old.copy(providerUid = providerUid, providerName = providerName)
+            _projects.value = currentProjects
+        }
+    }
+
+    fun addInvitation(invitation: ProviderInvitation) {
+        val currentList = _invitations.value.toMutableList()
+        currentList.add(invitation)
+        _invitations.value = currentList
+    }
+
+    fun addQuotation(quotation: Quotation) {
+        val currentList = _quotations.value.toMutableList()
+        currentList.add(quotation)
+        _quotations.value = currentList
+    }
+
+    fun markQuotationSentToClient(quotationId: String) {
+        val currentList = _quotations.value.toMutableList()
+        val index = currentList.indexOfFirst { it.id == quotationId }
+        if (index != -1) {
+            currentList[index] = currentList[index].copy(sentToClient = true)
+            _quotations.value = currentList
+        }
+    }
+
+    fun addPerformanceEvaluation(evaluation: PerformanceEvaluation) {
+        val currentList = _evaluations.value.toMutableList()
+        currentList.add(evaluation)
+        _evaluations.value = currentList
+    }
+
+    fun evaluateProject(projectId: String, providerRating: Float, consultantRating: Float, evaluationResult: String, comments: String) {
+        val currentProjects = _projects.value.toMutableList()
+        val index = currentProjects.indexOfFirst { it.id == projectId }
+        if (index != -1) {
+            val old = currentProjects[index]
+            currentProjects[index] = old.copy(
+                providerRating = providerRating,
+                consultantRating = consultantRating,
+                evaluationResult = evaluationResult,
+                comments = comments
+            )
+            _projects.value = currentProjects
+        }
+    }
 }
+

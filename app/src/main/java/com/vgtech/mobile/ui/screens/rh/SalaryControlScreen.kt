@@ -187,9 +187,19 @@ fun WorkLogItem(log: WorkLog, formatter: NumberFormat) {
                 if (log.observations.isNotEmpty()) {
                     Text(log.observations, style = MaterialTheme.typography.bodySmall, color = TextMuted)
                 }
+                if (log.overtimeHours > 0) {
+                    Text(
+                        "⏱ ${log.overtimeHours}h extras al ${(log.overtimeRate * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = WarningAmber,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("${log.hoursWorked} hrs", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Navy)
+                if (log.hoursWorked > 0) {
+                    Text("${log.hoursWorked} hrs", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Navy)
+                }
                 Text(formatter.format(log.totalPay), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Teal)
             }
         }
@@ -248,9 +258,15 @@ fun ManageSalaryDialog(
 @Composable
 fun AddHoursContent(employee: Employee, onConfirm: (Double, Double, String) -> Unit) {
     var hours by remember { mutableStateOf("") }
+    var overtimeHours by remember { mutableStateOf("") }
+    var overtimeRatePercent by remember { mutableStateOf("200") }
     var obs by remember { mutableStateOf("") }
     val hourlyRate = employee.pagoPorHora
-    val total = (hours.toDoubleOrNull() ?: 0.0) * hourlyRate
+    val regularPay = (hours.toDoubleOrNull() ?: 0.0) * hourlyRate
+    val overtimeVal = overtimeHours.toDoubleOrNull() ?: 0.0
+    val overtimeMultiplier = (overtimeRatePercent.toDoubleOrNull() ?: 200.0) / 100.0
+    val overtimePay = overtimeVal * hourlyRate * overtimeMultiplier
+    val total = regularPay + overtimePay
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Tarifa actual: ${NumberFormat.getCurrencyInstance(Locale("es", "MX")).format(hourlyRate)} / hora", fontWeight = FontWeight.Bold, color = Teal)
@@ -262,6 +278,26 @@ fun AddHoursContent(employee: Employee, onConfirm: (Double, Double, String) -> U
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
         )
+
+        // Overtime section
+        Text("Horas Extras", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Navy)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = overtimeHours,
+                onValueChange = { if (it.isEmpty() || it.toDoubleOrNull() != null) overtimeHours = it },
+                label = { Text("Horas extras") },
+                modifier = Modifier.weight(1f),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+            )
+            OutlinedTextField(
+                value = overtimeRatePercent,
+                onValueChange = { if (it.isEmpty() || it.toDoubleOrNull() != null) overtimeRatePercent = it },
+                label = { Text("Tasa") },
+                modifier = Modifier.width(90.dp),
+                suffix = { Text("%") },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+            )
+        }
 
         OutlinedTextField(
             value = obs,
@@ -275,19 +311,45 @@ fun AddHoursContent(employee: Employee, onConfirm: (Double, Double, String) -> U
             color = TealLight.copy(alpha = 0.2f),
             shape = RoundedCornerShape(8.dp)
         ) {
-            Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Total a pagar:", fontWeight = FontWeight.Bold)
-                Text(NumberFormat.getCurrencyInstance(Locale("es", "MX")).format(total), fontWeight = FontWeight.ExtraBold, color = Teal, style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Pago regular:", style = MaterialTheme.typography.bodySmall)
+                    Text(NumberFormat.getCurrencyInstance(Locale("es", "MX")).format(regularPay), fontWeight = FontWeight.Bold)
+                }
+                if (overtimeVal > 0) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Pago horas extras (${overtimeRatePercent}%):", style = MaterialTheme.typography.bodySmall, color = WarningAmber)
+                        Text(NumberFormat.getCurrencyInstance(Locale("es", "MX")).format(overtimePay), fontWeight = FontWeight.Bold, color = WarningAmber)
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Total a pagar:", fontWeight = FontWeight.Bold)
+                    Text(NumberFormat.getCurrencyInstance(Locale("es", "MX")).format(total), fontWeight = FontWeight.ExtraBold, color = Teal, style = MaterialTheme.typography.titleMedium)
+                }
             }
         }
 
         Button(
-            onClick = { onConfirm(hours.toDoubleOrNull() ?: 0.0, hourlyRate, obs) },
+            onClick = {
+                // We pass overtime info via the observation and handle in the caller
+                val h = hours.toDoubleOrNull() ?: 0.0
+                InternalDb.addWorkLog(WorkLog(
+                    employeeUid = employee.uid,
+                    employeeName = employee.nombreCompleto,
+                    hoursWorked = h,
+                    overtimeHours = overtimeVal,
+                    overtimeRate = overtimeMultiplier,
+                    hourlyRateAtTime = hourlyRate,
+                    observations = obs
+                ))
+                onConfirm(h, hourlyRate, obs)
+            },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = Teal),
-            enabled = hours.isNotEmpty() && (hours.toDoubleOrNull() ?: 0.0) > 0
+            enabled = (hours.isNotEmpty() && (hours.toDoubleOrNull() ?: 0.0) > 0) || overtimeVal > 0
         ) {
-            Text("Registrar Pago por Horas")
+            Text("Registrar Pago")
         }
     }
 }
