@@ -42,33 +42,72 @@ object InternalDb {
         val currentConsultantUid = "consultor-uid"
         val provUid = "prov-uid"
 
-        // ── Expanded seed users ──────────────────────────────────
+        // ── Empleados RH / Administrativos ───────────────────────────────
+        // Coherencia salarial:
+        //   RH/Admin:     $18,000–$28,000/mes | $112–$175/h
+        //   Supervisor:   $32,000–$42,000/mes | $200–$262/h
+        //   Consultor:    $26,000–$35,000/mes | $162–$218/h
+        //   Proveedores:  Sin sueldo fijo — se paga por servicio (50/50 del ingreso del cliente)
         val generatedUsers = mutableListOf<Employee>()
-        generatedUsers.add(Employee(uid = "admin-uid", nombreCompleto = "Admin RH User", email = "admin@vgtech.com", puesto = "RH", password = "admin", activo = true, sueldo = 25000.0, pagoPorHora = 156.25, diasVacaciones = 12.0))
-        generatedUsers.add(Employee(uid = "sup-uid", nombreCompleto = "Carlos Mendoza", email = "supervisor@vgtech.com", puesto = "Supervisor", password = "super", activo = true, sueldo = 35000.0, pagoPorHora = 218.75, diasVacaciones = 14.0))
-        generatedUsers.add(Employee(uid = provUid, nombreCompleto = "Proveedor General", email = "proveedor@vgtech.com", puesto = "Proveedor", password = "prov", activo = true, tipoTrabajo = listOf("Instalaciones", "Obra Civil"), sueldo = 0.0, pagoPorHora = 180.0, diasVacaciones = 0.0))
-        generatedUsers.add(Employee(uid = "prov-2", nombreCompleto = "Materiales del Norte", email = "norte@vgtech.com", puesto = "Proveedor", password = "prov2", activo = true, tipoTrabajo = listOf("Materiales", "Acabados"), sueldo = 0.0, pagoPorHora = 160.0, diasVacaciones = 0.0))
-        generatedUsers.add(Employee(uid = "prov-3", nombreCompleto = "Electro Servicios MX", email = "electro@vgtech.com", puesto = "Proveedor", password = "prov3", activo = true, tipoTrabajo = listOf("Eléctrico", "Iluminación"), sueldo = 0.0, pagoPorHora = 200.0, diasVacaciones = 0.0))
-        generatedUsers.add(Employee(uid = currentConsultantUid, nombreCompleto = "Consultor Externo", email = "consultor@vgtech.com", puesto = "Consultor", password = "cons", activo = true, sueldo = 28000.0, pagoPorHora = 175.0, diasVacaciones = 10.0))
-        generatedUsers.add(Employee(uid = "cons-2", nombreCompleto = "Ana García López", email = "ana@vgtech.com", puesto = "Consultor", password = "cons2", activo = true, sueldo = 30000.0, pagoPorHora = 187.50, diasVacaciones = 12.0))
-        generatedUsers.add(Employee(uid = "cons-3", nombreCompleto = "Roberto Díaz Martín", email = "roberto@vgtech.com", puesto = "Consultor", password = "cons3", activo = true, sueldo = 26000.0, pagoPorHora = 162.50, diasVacaciones = 8.0))
-        generatedUsers.add(Employee(uid = "cliente-uid", nombreCompleto = "Cliente Corporativo", email = "cliente@vgtech.com", puesto = "Cliente", password = "cli", activo = true))
+
+        // ── RH & Administrativos ─────────────────────────────────────────
+        generatedUsers.add(Employee(uid = "admin-uid",   nombreCompleto = "Laura Ramírez Torres",   email = "admin@vgtech.com",       puesto = "RH",             password = "admin",  activo = true, sueldo = 25000.0, pagoPorHora = 156.25, diasVacaciones = 12.0))
+        generatedUsers.add(Employee(uid = "adm-2",       nombreCompleto = "Jorge Herrera Salinas",  email = "jorge.h@vgtech.com",     puesto = "Administrativo", password = "adm2",   activo = true, sueldo = 20000.0, pagoPorHora = 125.00, diasVacaciones = 10.0))
+        generatedUsers.add(Employee(uid = "adm-3",       nombreCompleto = "Patricia Vela Muñoz",    email = "patricia.v@vgtech.com",  puesto = "Administrativo", password = "adm3",   activo = true, sueldo = 18500.0, pagoPorHora = 115.62, diasVacaciones = 10.0))
+        generatedUsers.add(Employee(uid = "adm-4",       nombreCompleto = "Miguel Ángel Cruz",      email = "miguel.c@vgtech.com",    puesto = "Empleado",       password = "adm4",   activo = true, sueldo = 16000.0, pagoPorHora = 100.00, diasVacaciones = 8.0))
+        generatedUsers.add(Employee(uid = "adm-5",       nombreCompleto = "Sofía Mendez Arriaga",   email = "sofia.m@vgtech.com",     puesto = "Empleado",       password = "adm5",   activo = true, sueldo = 16500.0, pagoPorHora = 103.12, diasVacaciones = 8.0))
+
+        // ── Supervisores ─────────────────────────────────────────────────
+        generatedUsers.add(Employee(uid = "sup-uid",     nombreCompleto = "Carlos Mendoza Ríos",    email = "supervisor@vgtech.com",  puesto = "Supervisor",     password = "super",  activo = true, sueldo = 38000.0, pagoPorHora = 237.50, diasVacaciones = 15.0))
+        generatedUsers.add(Employee(uid = "sup-2",       nombreCompleto = "Alejandro Fuentes",      email = "alejandro.f@vgtech.com", puesto = "Supervisor",     password = "sup2",   activo = true, sueldo = 35000.0, pagoPorHora = 218.75, diasVacaciones = 14.0))
+        generatedUsers.add(Employee(uid = "sup-3",       nombreCompleto = "Daniela Ortiz Peña",     email = "daniela.o@vgtech.com",   puesto = "Supervisor",     password = "sup3",   activo = true, sueldo = 33000.0, pagoPorHora = 206.25, diasVacaciones = 12.0))
+
+        // ── Consultores ──────────────────────────────────────────────────
+        generatedUsers.add(Employee(uid = currentConsultantUid, nombreCompleto = "Fernando Castillo",  email = "consultor@vgtech.com",   puesto = "Consultor",  password = "cons",   activo = true, sueldo = 32000.0, pagoPorHora = 200.00, diasVacaciones = 12.0))
+        generatedUsers.add(Employee(uid = "cons-2",      nombreCompleto = "Ana García López",        email = "ana@vgtech.com",          puesto = "Consultor",  password = "cons2",  activo = true, sueldo = 30000.0, pagoPorHora = 187.50, diasVacaciones = 12.0))
+        generatedUsers.add(Employee(uid = "cons-3",      nombreCompleto = "Roberto Díaz Martín",    email = "roberto@vgtech.com",      puesto = "Consultor",  password = "cons3",  activo = true, sueldo = 28000.0, pagoPorHora = 175.00, diasVacaciones = 10.0))
+        generatedUsers.add(Employee(uid = "cons-4",      nombreCompleto = "Isabel Navarro Vega",    email = "isabel.n@vgtech.com",     puesto = "Consultor",  password = "cons4",  activo = true, sueldo = 26500.0, pagoPorHora = 165.62, diasVacaciones = 10.0))
+
+        // ── Proveedores (pago por servicio, sueldo = 0) ──────────────────
+        // Cada proyecto genera un ingreso del cliente. La mitad va al proveedor (50/50).
+        // Transacciones en ProviderTxDb reflejan los proyectos reales.
+        generatedUsers.add(Employee(uid = provUid,       nombreCompleto = "Constructora Pérez S.A.", email = "proveedor@vgtech.com",   puesto = "Proveedor",  password = "prov",   activo = true, tipoTrabajo = listOf("Obra Civil", "Cimentación"), sueldo = 0.0, pagoPorHora = 0.0, diasVacaciones = 0.0))
+        generatedUsers.add(Employee(uid = "prov-2",      nombreCompleto = "Materiales del Norte",    email = "norte@vgtech.com",        puesto = "Proveedor",  password = "prov2",  activo = true, tipoTrabajo = listOf("Materiales", "Acabados"),    sueldo = 0.0, pagoPorHora = 0.0, diasVacaciones = 0.0))
+        generatedUsers.add(Employee(uid = "prov-3",      nombreCompleto = "Electro Servicios MX",    email = "electro@vgtech.com",      puesto = "Proveedor",  password = "prov3",  activo = true, tipoTrabajo = listOf("Eléctrico", "Iluminación"),  sueldo = 0.0, pagoPorHora = 0.0, diasVacaciones = 0.0))
+        generatedUsers.add(Employee(uid = "prov-4",      nombreCompleto = "Hidráulica Integral",     email = "hidro@vgtech.com",        puesto = "Proveedor",  password = "prov4",  activo = true, tipoTrabajo = listOf("Plomería", "Hidráulica"),    sueldo = 0.0, pagoPorHora = 0.0, diasVacaciones = 0.0))
+        generatedUsers.add(Employee(uid = "prov-5",      nombreCompleto = "Arquitectura & Diseño MX",email = "arqdmx@vgtech.com",       puesto = "Proveedor",  password = "prov5",  activo = true, tipoTrabajo = listOf("Diseño", "Acabados"),        sueldo = 0.0, pagoPorHora = 0.0, diasVacaciones = 0.0))
+
+        // ── Cliente ──────────────────────────────────────────────────────
+        generatedUsers.add(Employee(uid = "cliente-uid", nombreCompleto = "Grupo Empresarial León",  email = "cliente@vgtech.com",      puesto = "Cliente",    password = "cli",    activo = true))
 
         _employees.value = generatedUsers
 
-        // ── Expanded seed projects ───────────────────────────────
+        // ── Proyectos coherentes con proveedores y transacciones ─────────
+        // Cada proyecto tiene un presupuesto del cliente. El 50% va al proveedor asignado.
+        // Los montos de las transacciones en ProviderTxDb corresponden a estos proyectos.
+        //
+        // Resumen financiero (ingreso del cliente → 50% empresa / 50% proveedor):
+        //   Hospital General – Fase 1 : $360,000 cliente → prov-uid  $180,000 (PAGADO)
+        //   Hospital General – Fase 2 : $240,000 cliente → prov-uid  $120,000 (PENDIENTE $60,000)
+        //   Residencial Las Lomas     : $500,000 cliente → prov-2    $250,000 (PENDIENTE $150,000)
+        //   Torre Corporativa Alfa    : $420,000 cliente → prov-2    $210,000 (PENDIENTE $210,000)
+        //   Plaza Comercial Sur       : $300,000 cliente → prov-3    $150,000 (PAGADO)
+        //   Parque Industrial Oriente : $280,000 cliente → prov-3    $140,000 (PENDIENTE $80,000)
+        //   Clínica Privada Norte     : $180,000 cliente → prov-4    $90,000  (PENDIENTE $90,000)
+        //   Centro Educativo Federal  : $220,000 cliente → prov-5    $110,000 (PAGADO $110,000)
         _projects.value = listOf(
+            // ── FINALIZADOS ─────────────────────────────────────────────
             Project(
                 id = "proj-101",
-                title = "Hospital General - Fase 1",
-                description = "Instalaciones iniciales y planos.",
+                title = "Hospital General – Fase 1",
+                description = "Obra civil e instalaciones iniciales. Presupuesto cliente: \$360,000.",
                 consultantUid = currentConsultantUid,
                 providerUid = provUid,
-                providerName = "Proveedor General",
+                providerName = "Constructora Pérez S.A.",
                 supervisorUid = "sup-uid",
                 progress = 1.0f,
                 status = "Finalizado",
-                comments = "Excelente coordinación en la primera etapa. El proveedor cumplió con los estándares de seguridad.",
+                comments = "Entrega puntual. El proveedor cumplió con los estándares de seguridad.",
                 hasDelays = false,
                 providerRating = 4.8f,
                 consultantRating = 5.0f,
@@ -76,77 +115,105 @@ object InternalDb {
             ),
             Project(
                 id = "proj-102",
-                title = "Centro Logístico Norte",
-                description = "Auditoría de cimentación.",
-                consultantUid = currentConsultantUid,
-                providerUid = provUid,
-                providerName = "Proveedor General",
-                supervisorUid = "sup-uid",
+                title = "Plaza Comercial Sur",
+                description = "Instalaciones eléctricas completas. Presupuesto cliente: \$300,000.",
+                consultantUid = "cons-2",
+                providerUid = "prov-3",
+                providerName = "Electro Servicios MX",
+                supervisorUid = "sup-2",
                 progress = 1.0f,
                 status = "Finalizado",
-                comments = "Hubo problemas con el suministro de concreto, pero se resolvió.",
-                hasDelays = true,
-                delayReason = "Escasez de materiales de construcción en la zona.",
-                providerRating = 3.5f,
-                consultantRating = 4.2f,
-                evaluationResult = "Satisfactorio"
+                comments = "Excelente trabajo eléctrico. Sin observaciones.",
+                hasDelays = false,
+                providerRating = 4.9f,
+                consultantRating = 4.7f,
+                evaluationResult = "Aprobado"
             ),
             Project(
+                id = "proj-103",
+                title = "Centro Educativo Federal",
+                description = "Diseño arquitectónico y acabados. Presupuesto cliente: \$220,000.",
+                consultantUid = "cons-4",
+                providerUid = "prov-5",
+                providerName = "Arquitectura & Diseño MX",
+                supervisorUid = "sup-3",
+                progress = 1.0f,
+                status = "Finalizado",
+                comments = "Acabados de alta calidad. Cliente satisfecho.",
+                hasDelays = false,
+                providerRating = 4.6f,
+                consultantRating = 4.8f,
+                evaluationResult = "Aprobado con Distinción"
+            ),
+            // ── EN PROGRESO ─────────────────────────────────────────────
+            Project(
                 id = "proj-1",
-                title = "Hospital General - Fase 3",
-                description = "Revisión de instalaciones de oxígeno.",
+                title = "Hospital General – Fase 2",
+                description = "Ampliación de instalaciones y sistemas de oxígeno. Presupuesto cliente: \$240,000.",
                 consultantUid = currentConsultantUid,
                 providerUid = provUid,
-                providerName = "Proveedor General",
+                providerName = "Constructora Pérez S.A.",
                 supervisorUid = "sup-uid",
-                progress = 0.85f,
+                progress = 0.75f,
                 status = "En Progreso"
             ),
             Project(
                 id = "proj-2",
                 title = "Residencial Las Lomas",
-                description = "Estructura principal.",
+                description = "Estructura principal y cimentación. Presupuesto cliente: \$500,000.",
                 consultantUid = "cons-2",
-                providerUid = provUid,
-                providerName = "Proveedor General",
-                supervisorUid = "sup-uid",
-                progress = 0.50f,
+                providerUid = "prov-2",
+                providerName = "Materiales del Norte",
+                supervisorUid = "sup-2",
+                progress = 0.60f,
                 status = "En Progreso"
             ),
             Project(
                 id = "proj-3",
                 title = "Torre Corporativa Alfa",
-                description = "Diseño y supervisión de obra.",
+                description = "Diseño, supervisión y suministro de materiales. Presupuesto cliente: \$420,000.",
                 consultantUid = "cons-3",
                 providerUid = "prov-2",
                 providerName = "Materiales del Norte",
                 supervisorUid = "sup-uid",
-                progress = 0.30f,
+                progress = 0.35f,
                 status = "En Progreso",
                 hasDelays = true,
                 delayReason = "Retraso en permisos municipales."
             ),
             Project(
                 id = "proj-4",
-                title = "Plaza Comercial Sur",
-                description = "Instalaciones eléctricas y acabados.",
+                title = "Parque Industrial Oriente",
+                description = "Red eléctrica e iluminación industrial. Presupuesto cliente: \$280,000.",
+                consultantUid = "cons-2",
+                providerUid = "prov-3",
+                providerName = "Electro Servicios MX",
+                supervisorUid = "sup-3",
+                progress = 0.45f,
+                status = "En Progreso"
+            ),
+            Project(
+                id = "proj-5",
+                title = "Clínica Privada Norte",
+                description = "Sistema hidráulico y plomería completa. Presupuesto cliente: \$180,000.",
+                consultantUid = "cons-4",
+                providerUid = "prov-4",
+                providerName = "Hidráulica Integral",
+                supervisorUid = "sup-2",
+                progress = 0.20f,
+                status = "En Progreso"
+            ),
+            // ── PENDIENTE ──────────────────────────────────────────────
+            Project(
+                id = "proj-6",
+                title = "Estadio Municipal Reforma",
+                description = "Obra civil integral. Pendiente de asignación de proveedor.",
                 consultantUid = null,
                 providerUid = null,
                 providerName = "",
                 supervisorUid = "sup-uid",
                 progress = 0f,
                 status = "Pendiente"
-            ),
-            Project(
-                id = "proj-5",
-                title = "Parque Industrial Oriente",
-                description = "Cimentación y estructura metálica.",
-                consultantUid = "cons-2",
-                providerUid = "prov-3",
-                providerName = "Electro Servicios MX",
-                supervisorUid = "sup-uid",
-                progress = 0.15f,
-                status = "En Progreso"
             )
         )
         

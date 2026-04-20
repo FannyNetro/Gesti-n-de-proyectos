@@ -35,7 +35,8 @@ fun RHDashboardScreen(
         DrawerItem("vacaciones", "Vacaciones", Icons.Filled.BeachAccess, Icons.Outlined.BeachAccess),
         DrawerItem("sueldos", "Sueldos y Pagos", Icons.Filled.Payments, Icons.Outlined.Payments),
         DrawerItem("supervisores", "Supervisores", Icons.Filled.Engineering, Icons.Outlined.Engineering),
-        DrawerItem("proveedores", "Proveedores", Icons.Filled.Handshake, Icons.Outlined.Handshake),
+        DrawerItem("proveedores", "Directorio Prov.", Icons.Filled.Handshake, Icons.Outlined.Handshake),
+        DrawerItem("cuentas_proveedores", "Cuentas por Pagar", Icons.Filled.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet),
         DrawerItem("consultores", "Consultores", Icons.Filled.BusinessCenter, Icons.Outlined.BusinessCenter),
         DrawerItem("registrar", "Registrar", Icons.Filled.PersonAdd, Icons.Outlined.PersonAdd),
         DrawerItem("perfil", "Mi Perfil", Icons.Filled.AccountCircle, Icons.Outlined.AccountCircle)
@@ -114,6 +115,7 @@ fun RHDashboardScreen(
                     "sueldos" -> SalaryControlScreen()
                     "supervisores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Supervisor"))
                     "proveedores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Proveedor"))
+                    "cuentas_proveedores" -> ProviderPayableScreen()
                     "consultores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Consultor"))
                     "registrar" -> EmployeeRegistrationScreen(employeeViewModel = employeeViewModel, onBack = { selectedDrawerRoute = "empleados" })
                     "perfil" -> ProfileTab(onLogout = onLogout)
