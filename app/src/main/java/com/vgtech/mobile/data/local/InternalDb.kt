@@ -232,7 +232,8 @@ object InternalDb {
                 providerName = "Electro Servicios MX",
                 amount = 450000.0,
                 estimatedDays = 45,
-                description = "Incluye cableado y tableros."
+                description = "Incluye cableado y tableros.",
+                sentToClient = true
             )
         )
     }
@@ -381,6 +382,12 @@ object InternalDb {
     fun markQuotationSentToClient(quotationId: String) {
         _quotations.value = _quotations.value.map {
             if (it.id == quotationId) it.copy(sentToClient = true) else it
+        }
+    }
+
+    fun updateQuotationClientStatus(quotationId: String, status: String) {
+        _quotations.value = _quotations.value.map {
+            if (it.id == quotationId) it.copy(clientStatus = status) else it
         }
     }
 

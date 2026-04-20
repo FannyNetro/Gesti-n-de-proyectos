@@ -31,7 +31,8 @@ data class Quotation(
     val estimatedDays: Int = 0,
     val description: String = "",
     val date: Long = System.currentTimeMillis(),
-    val sentToClient: Boolean = false
+    val sentToClient: Boolean = false,
+    val clientStatus: String = "Pendiente" // "Pendiente", "Aprobada", "Rechazada"
 )
 
 /**
