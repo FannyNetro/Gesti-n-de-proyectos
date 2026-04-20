@@ -44,14 +44,14 @@ object InternalDb {
 
         // ── Expanded seed users ──────────────────────────────────
         val generatedUsers = mutableListOf<Employee>()
-        generatedUsers.add(Employee(uid = "admin-uid", nombreCompleto = "Admin RH User", email = "admin@vgtech.com", puesto = "RH", password = "admin", activo = true, sueldo = 25000.0, pagoPorHora = 156.25, diasVacaciones = 12))
-        generatedUsers.add(Employee(uid = "sup-uid", nombreCompleto = "Carlos Mendoza", email = "supervisor@vgtech.com", puesto = "Supervisor", password = "super", activo = true, sueldo = 35000.0, pagoPorHora = 218.75, diasVacaciones = 14))
-        generatedUsers.add(Employee(uid = provUid, nombreCompleto = "Proveedor General", email = "proveedor@vgtech.com", puesto = "Proveedor", password = "prov", activo = true, tipoTrabajo = listOf("Instalaciones", "Obra Civil"), sueldo = 0.0, pagoPorHora = 180.0, diasVacaciones = 0))
-        generatedUsers.add(Employee(uid = "prov-2", nombreCompleto = "Materiales del Norte", email = "norte@vgtech.com", puesto = "Proveedor", password = "prov2", activo = true, tipoTrabajo = listOf("Materiales", "Acabados"), sueldo = 0.0, pagoPorHora = 160.0, diasVacaciones = 0))
-        generatedUsers.add(Employee(uid = "prov-3", nombreCompleto = "Electro Servicios MX", email = "electro@vgtech.com", puesto = "Proveedor", password = "prov3", activo = true, tipoTrabajo = listOf("Eléctrico", "Iluminación"), sueldo = 0.0, pagoPorHora = 200.0, diasVacaciones = 0))
-        generatedUsers.add(Employee(uid = currentConsultantUid, nombreCompleto = "Consultor Externo", email = "consultor@vgtech.com", puesto = "Consultor", password = "cons", activo = true, sueldo = 28000.0, pagoPorHora = 175.0, diasVacaciones = 10))
-        generatedUsers.add(Employee(uid = "cons-2", nombreCompleto = "Ana García López", email = "ana@vgtech.com", puesto = "Consultor", password = "cons2", activo = true, sueldo = 30000.0, pagoPorHora = 187.50, diasVacaciones = 12))
-        generatedUsers.add(Employee(uid = "cons-3", nombreCompleto = "Roberto Díaz Martín", email = "roberto@vgtech.com", puesto = "Consultor", password = "cons3", activo = true, sueldo = 26000.0, pagoPorHora = 162.50, diasVacaciones = 8))
+        generatedUsers.add(Employee(uid = "admin-uid", nombreCompleto = "Admin RH User", email = "admin@vgtech.com", puesto = "RH", password = "admin", activo = true, sueldo = 25000.0, pagoPorHora = 156.25, diasVacaciones = 12.0))
+        generatedUsers.add(Employee(uid = "sup-uid", nombreCompleto = "Carlos Mendoza", email = "supervisor@vgtech.com", puesto = "Supervisor", password = "super", activo = true, sueldo = 35000.0, pagoPorHora = 218.75, diasVacaciones = 14.0))
+        generatedUsers.add(Employee(uid = provUid, nombreCompleto = "Proveedor General", email = "proveedor@vgtech.com", puesto = "Proveedor", password = "prov", activo = true, tipoTrabajo = listOf("Instalaciones", "Obra Civil"), sueldo = 0.0, pagoPorHora = 180.0, diasVacaciones = 0.0))
+        generatedUsers.add(Employee(uid = "prov-2", nombreCompleto = "Materiales del Norte", email = "norte@vgtech.com", puesto = "Proveedor", password = "prov2", activo = true, tipoTrabajo = listOf("Materiales", "Acabados"), sueldo = 0.0, pagoPorHora = 160.0, diasVacaciones = 0.0))
+        generatedUsers.add(Employee(uid = "prov-3", nombreCompleto = "Electro Servicios MX", email = "electro@vgtech.com", puesto = "Proveedor", password = "prov3", activo = true, tipoTrabajo = listOf("Eléctrico", "Iluminación"), sueldo = 0.0, pagoPorHora = 200.0, diasVacaciones = 0.0))
+        generatedUsers.add(Employee(uid = currentConsultantUid, nombreCompleto = "Consultor Externo", email = "consultor@vgtech.com", puesto = "Consultor", password = "cons", activo = true, sueldo = 28000.0, pagoPorHora = 175.0, diasVacaciones = 10.0))
+        generatedUsers.add(Employee(uid = "cons-2", nombreCompleto = "Ana García López", email = "ana@vgtech.com", puesto = "Consultor", password = "cons2", activo = true, sueldo = 30000.0, pagoPorHora = 187.50, diasVacaciones = 12.0))
+        generatedUsers.add(Employee(uid = "cons-3", nombreCompleto = "Roberto Díaz Martín", email = "roberto@vgtech.com", puesto = "Consultor", password = "cons3", activo = true, sueldo = 26000.0, pagoPorHora = 162.50, diasVacaciones = 8.0))
         generatedUsers.add(Employee(uid = "cliente-uid", nombreCompleto = "Cliente Corporativo", email = "cliente@vgtech.com", puesto = "Cliente", password = "cli", activo = true))
 
         _employees.value = generatedUsers
@@ -230,259 +230,165 @@ object InternalDb {
                 projectTitle = "Plaza Comercial Sur",
                 providerUid = "prov-3",
                 providerName = "Electro Servicios MX",
-                amount = 450_000.0,
+                amount = 450000.0,
                 estimatedDays = 45,
-                description = "Incluye cableado, tableros y luminarias LED."
-            )
-        )
-
-        // ── Seed evaluations ─────────────────────────────────────
-        _evaluations.value = listOf(
-            PerformanceEvaluation(
-                id = "eval-1",
-                evaluatedUid = currentConsultantUid,
-                evaluatedName = "Consultor Externo",
-                evaluatedRole = "Consultor",
-                projectId = "proj-101",
-                projectTitle = "Hospital General - Fase 1",
-                qualityRating = 5f,
-                timelinessRating = 5f,
-                communicationRating = 4.5f,
-                overallRating = 4.8f,
-                comments = "Excelente desempeño."
+                description = "Incluye cableado y tableros."
             )
         )
     }
 
-    fun addEmployee(employee: Employee) {
-        val currentList = _employees.value.toMutableList()
-        currentList.add(employee)
-        _employees.value = currentList
+    // ── Employee Methods ──────────────────────────
+    fun getEmployeeById(uid: String): Employee? {
+        return _employees.value.find { it.uid == uid }
     }
 
     fun getEmployeeByEmail(email: String): Employee? {
         return _employees.value.find { it.email == email }
     }
 
-    fun getEmployeeById(uid: String): Employee? {
-        return _employees.value.find { it.uid == uid }
+    fun addEmployee(employee: Employee) {
+        _employees.value += employee
     }
 
-    fun addProjectCancellationRequest(request: ProjectCancellationRequest) {
-        val currentList = _cancellationRequests.value.toMutableList()
-        currentList.add(request)
-        _cancellationRequests.value = currentList
+    fun updateEmployee(updated: Employee) {
+        _employees.value = _employees.value.map { if (it.uid == updated.uid) updated else it }
     }
 
-    fun updateEmployee(employee: Employee) {
-        val currentList = _employees.value.toMutableList()
-        val index = currentList.indexOfFirst { it.uid == employee.uid }
-        if (index != -1) {
-            currentList[index] = employee
-            _employees.value = currentList
-        }
+    fun deactivateEmployee(uid: String, motivo: String = "") {
+        val employee = getEmployeeById(uid) ?: return
+        updateEmployee(employee.copy(activo = false, motivoInactivo = motivo))
     }
 
-    fun updateEmployeePassword(uid: String, newPassword: String) {
-        val currentList = _employees.value.toMutableList()
-        val index = currentList.indexOfFirst { it.uid == uid }
-        if (index != -1) {
-            val oldEmployee = currentList[index]
-            currentList[index] = oldEmployee.copy(password = newPassword)
-            _employees.value = currentList
-        }
+    fun updateEmployeePassword(uid: String, newPass: String) {
+        val employee = getEmployeeById(uid) ?: return
+        updateEmployee(employee.copy(password = newPass))
     }
 
     fun updateEmployeeRates(uid: String, sueldo: Double, pagoPorHora: Double) {
-        val currentList = _employees.value.toMutableList()
-        val index = currentList.indexOfFirst { it.uid == uid }
-        if (index != -1) {
-            val oldEmployee = currentList[index]
-            currentList[index] = oldEmployee.copy(sueldo = sueldo, pagoPorHora = pagoPorHora)
-            _employees.value = currentList
-        }
+        val employee = getEmployeeById(uid) ?: return
+        updateEmployee(employee.copy(sueldo = sueldo, pagoPorHora = pagoPorHora))
     }
 
-    fun deactivateEmployee(uid: String, motivo: String) {
-        val currentList = _employees.value.toMutableList()
-        val index = currentList.indexOfFirst { it.uid == uid }
-        if (index != -1) {
-            val oldEmployee = currentList[index]
-            currentList[index] = oldEmployee.copy(activo = false, motivoInactivo = motivo)
-            _employees.value = currentList
-        }
+    // ── Vacation Methods ──────────────────────────
+    fun addVacationRequest(req: VacationRequest) {
+        _vacationRequests.value += req
     }
 
-    fun addVacationRequest(request: VacationRequest) {
-        val currentList = _vacationRequests.value.toMutableList()
-        currentList.add(request)
-        _vacationRequests.value = currentList
+    fun updateVacationRequest(updated: VacationRequest) {
+        _vacationRequests.value = _vacationRequests.value.map { if (it.id == updated.id) updated else it }
     }
 
     fun updateVacationStatus(requestId: String, status: VacationStatus) {
-        val currentRequests = _vacationRequests.value.toMutableList()
-        val index = currentRequests.indexOfFirst { it.id == requestId }
-        if (index != -1) {
-            val oldRequest = currentRequests[index]
-            val updatedRequest = oldRequest.copy(status = status)
-            currentRequests[index] = updatedRequest
-            _vacationRequests.value = currentRequests
-        }
-    }
+        val request = _vacationRequests.value.find { it.id == requestId } ?: return
+        val updatedRequest = request.copy(status = status)
+        updateVacationRequest(updatedRequest)
 
-    fun addWorkLog(workLog: WorkLog) {
-        val currentList = _workLogs.value.toMutableList()
-        currentList.add(workLog)
-        _workLogs.value = currentList
-    }
-
-    fun addProjectProgress(report: ProjectProgress) {
-        val currentReports = _projectProgressReports.value.toMutableList()
-        currentReports.add(report)
-        _projectProgressReports.value = currentReports
-    }
-
-    fun evaluateProgress(
-        reportId: String, 
-        evaluation: String, 
-        comments: String, 
-        rating: Float, 
-        imageUrl: String?,
-        modifiedProgress: Int? = null,
-        modificationReason: String = ""
-    ) {
-        val currentReports = _projectProgressReports.value.toMutableList()
-        val index = currentReports.indexOfFirst { it.id == reportId }
-        if (index != -1) {
-            val oldReport = currentReports[index]
-            
-            // 1. Update the report with evaluation and possible correction
-            val updatedReport = oldReport.copy(
-                evaluated = true,
-                consultantEvaluation = evaluation,
-                consultantComments = comments,
-                evaluationRating = rating,
-                evaluationImageUrl = imageUrl,
-                wasModified = modifiedProgress != null,
-                originalProgress = if (modifiedProgress != null) oldReport.progressPercentage else oldReport.originalProgress,
-                progressPercentage = modifiedProgress ?: oldReport.progressPercentage,
-                modificationReason = modificationReason
-            )
-            currentReports[index] = updatedReport
-            _projectProgressReports.value = currentReports
-
-            // 2. Sync with main project progress if changed
-            if (modifiedProgress != null) {
-                updateProjectProgress(oldReport.projectId, modifiedProgress / 100f)
-            } else {
-                updateProjectProgress(oldReport.projectId, oldReport.progressPercentage / 100f)
+        // If approved, deduct days from employee
+        if (status == VacationStatus.APPROVED) {
+            val employee = getEmployeeById(request.employeeUid)
+            employee?.let {
+                updateEmployee(it.copy(diasVacaciones = it.diasVacaciones - request.effectiveDays))
             }
         }
     }
 
-    fun updateProjectProgress(projectId: String, newProgress: Float) {
-        val currentProjects = _projects.value.toMutableList()
-        val index = currentProjects.indexOfFirst { it.id == projectId }
-        if (index != -1) {
-            val oldProject = currentProjects[index]
-            currentProjects[index] = oldProject.copy(progress = newProgress)
-            _projects.value = currentProjects
-        }
+    // ── Work Log Methods ──────────────────────────
+    fun addWorkLog(log: WorkLog) {
+        _workLogs.value += log
     }
 
-    fun toggleProjectMark(projectId: String) {
-        val currentProjects = _projects.value.toMutableList()
-        val index = currentProjects.indexOfFirst { it.id == projectId }
-        if (index != -1) {
-            val oldProject = currentProjects[index]
-            currentProjects[index] = oldProject.copy(isMarked = !oldProject.isMarked)
-            _projects.value = currentProjects
-        }
-    }
-
-    fun addChatMessage(message: ChatMessage) {
-        val currentList = _chatMessages.value.toMutableList()
-        currentList.add(message)
-        _chatMessages.value = currentList
-    }
-
-    // ── Supervisor CRUD functions ─────────────────────────────────
-
-    fun addProject(project: Project) {
-        val currentList = _projects.value.toMutableList()
-        currentList.add(project)
-        _projects.value = currentList
-    }
-
-    fun updateProject(project: Project) {
-        val currentList = _projects.value.toMutableList()
-        val index = currentList.indexOfFirst { it.id == project.id }
-        if (index != -1) {
-            currentList[index] = project
-            _projects.value = currentList
-        }
+    // ── Project Methods ──────────────────────────
+    fun updateProject(updated: Project) {
+        _projects.value = _projects.value.map { if (it.id == updated.id) updated else it }
     }
 
     fun assignConsultantToProject(projectId: String, consultantUid: String) {
-        val currentProjects = _projects.value.toMutableList()
-        val index = currentProjects.indexOfFirst { it.id == projectId }
-        if (index != -1) {
-            val old = currentProjects[index]
-            currentProjects[index] = old.copy(consultantUid = consultantUid)
-            _projects.value = currentProjects
-        }
+        val project = _projects.value.find { it.id == projectId } ?: return
+        updateProject(project.copy(consultantUid = consultantUid))
     }
 
     fun assignProviderToProject(projectId: String, providerUid: String, providerName: String) {
-        val currentProjects = _projects.value.toMutableList()
-        val index = currentProjects.indexOfFirst { it.id == projectId }
-        if (index != -1) {
-            val old = currentProjects[index]
-            currentProjects[index] = old.copy(providerUid = providerUid, providerName = providerName)
-            _projects.value = currentProjects
+        val project = _projects.value.find { it.id == projectId } ?: return
+        updateProject(project.copy(providerUid = providerUid, providerName = providerName, status = "En Progreso"))
+    }
+
+    fun toggleProjectMark(projectId: String) {
+        val project = _projects.value.find { it.id == projectId } ?: return
+        updateProject(project.copy(isMarked = !project.isMarked))
+    }
+
+    fun updateProjectProgress(projectId: String, progress: Float, status: String = "En Progreso") {
+        val project = _projects.value.find { it.id == projectId } ?: return
+        updateProject(project.copy(progress = progress, status = status))
+    }
+
+    fun addProjectProgress(report: ProjectProgress) {
+        _projectProgressReports.value += report
+    }
+
+    fun evaluateProgress(
+        reportId: String,
+        status: String = "Aprobado",
+        comment: String = "",
+        rating: Float = 5f,
+        imageUrl: String? = null,
+        modProgress: Int? = null,
+        modReason: String = ""
+    ) {
+        _projectProgressReports.value = _projectProgressReports.value.map {
+            if (it.id == reportId) {
+                it.copy(
+                    consultantComments = comment,
+                    evaluated = true,
+                    consultantEvaluation = status,
+                    evaluationRating = rating,
+                    evaluationImageUrl = imageUrl,
+                    wasModified = modProgress != null,
+                    originalProgress = if (modProgress != null) it.progressPercentage else it.originalProgress,
+                    progressPercentage = modProgress ?: it.progressPercentage,
+                    modificationReason = modReason
+                )
+            } else it
         }
     }
 
-    fun addInvitation(invitation: ProviderInvitation) {
-        val currentList = _invitations.value.toMutableList()
-        currentList.add(invitation)
-        _invitations.value = currentList
+    fun addProjectCancellationRequest(req: ProjectCancellationRequest) {
+        _cancellationRequests.value += req
     }
 
-    fun addQuotation(quotation: Quotation) {
-        val currentList = _quotations.value.toMutableList()
-        currentList.add(quotation)
-        _quotations.value = currentList
+    fun updateProjectCancellationRequest(updated: ProjectCancellationRequest) {
+        _cancellationRequests.value = _cancellationRequests.value.map { if (it.id == updated.id) updated else it }
+    }
+
+    // ── Chat Methods ──────────────────────────
+    fun addChatMessage(msg: ChatMessage) {
+        _chatMessages.value += msg
+    }
+
+    // ── Invitation & Quotation Methods ──────────────────────────
+    fun addInvitation(inv: ProviderInvitation) {
+        _invitations.value += inv
+    }
+
+    fun updateInvitation(updated: ProviderInvitation) {
+        _invitations.value = _invitations.value.map { if (it.id == updated.id) updated else it }
+    }
+
+    fun addQuotation(quot: Quotation) {
+        _quotations.value += quot
     }
 
     fun markQuotationSentToClient(quotationId: String) {
-        val currentList = _quotations.value.toMutableList()
-        val index = currentList.indexOfFirst { it.id == quotationId }
-        if (index != -1) {
-            currentList[index] = currentList[index].copy(sentToClient = true)
-            _quotations.value = currentList
+        _quotations.value = _quotations.value.map {
+            if (it.id == quotationId) it.copy(sentToClient = true) else it
         }
     }
 
-    fun addPerformanceEvaluation(evaluation: PerformanceEvaluation) {
-        val currentList = _evaluations.value.toMutableList()
-        currentList.add(evaluation)
-        _evaluations.value = currentList
+    fun addEvaluation(eval: PerformanceEvaluation) {
+        _evaluations.value += eval
     }
 
-    fun evaluateProject(projectId: String, providerRating: Float, consultantRating: Float, evaluationResult: String, comments: String) {
-        val currentProjects = _projects.value.toMutableList()
-        val index = currentProjects.indexOfFirst { it.id == projectId }
-        if (index != -1) {
-            val old = currentProjects[index]
-            currentProjects[index] = old.copy(
-                providerRating = providerRating,
-                consultantRating = consultantRating,
-                evaluationResult = evaluationResult,
-                comments = comments
-            )
-            _projects.value = currentProjects
-        }
+    fun addPerformanceEvaluation(eval: PerformanceEvaluation) {
+        _evaluations.value += eval
     }
 }
-

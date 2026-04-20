@@ -8,6 +8,8 @@ val NavyMid        = Color(0xFF1E293B) // Slate 800
 val NavyLight      = Color(0xFF334155) // Slate 700
 val NavyItemHover  = Color(0xFF475569) // Slate 600
 
+val DarkBlue       = Color(0xFF1E293B) // Added for compatibility
+
 val Teal           = Color(0xFF06B6D4) // Cyan 500
 val TealDark       = Color(0xFF0891B2) // Cyan 600
 val TealLight      = Color(0xFFCFFAFE) // Cyan 50

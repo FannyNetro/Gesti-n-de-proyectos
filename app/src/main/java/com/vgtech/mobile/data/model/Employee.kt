@@ -14,7 +14,7 @@ data class Employee(
     val puesto: String           = "",      // "Consultor", "Supervisor", "Administrativo", "RH", "Proveedor", "Cliente"
     val sueldo: Double           = 0.0,     // Sueldo mensual base o referencia
     val pagoPorHora: Double      = 0.0,     // Pago por hora trabajada
-    val diasVacaciones: Int      = 0,
+    val diasVacaciones: Double   = 0.0,     // Changed to Double to support 0.5 increments
     val password: String         = "",      // Stored for admin visibility (as per spec)
     val fechaRegistro: Long      = System.currentTimeMillis(),
     val activo: Boolean          = true,

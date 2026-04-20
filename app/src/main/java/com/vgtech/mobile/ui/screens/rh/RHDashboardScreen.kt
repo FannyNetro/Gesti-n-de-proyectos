@@ -115,7 +115,7 @@ fun RHDashboardScreen(
                     "supervisores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Supervisor"))
                     "proveedores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Proveedor"))
                     "consultores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Consultor"))
-                    "registrar" -> EmployeeRegistrationScreen(employeeViewModel = employeeViewModel)
+                    "registrar" -> EmployeeRegistrationScreen(employeeViewModel = employeeViewModel, onBack = { selectedDrawerRoute = "empleados" })
                     "perfil" -> ProfileTab(onLogout = onLogout)
                 }
             }
