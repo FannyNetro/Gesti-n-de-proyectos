@@ -32,7 +32,8 @@ data class Quotation(
     val description: String = "",
     val date: Long = System.currentTimeMillis(),
     val sentToClient: Boolean = false,
-    val clientStatus: String = "Pendiente" // "Pendiente", "Aprobada", "Rechazada"
+    val clientStatus: String = "Pendiente", // "Pendiente", "Aprobada", "Rechazada"
+    val supervisorConfirmed: Boolean = false  // true once supervisor formally accepts client's approval
 )
 
 /**

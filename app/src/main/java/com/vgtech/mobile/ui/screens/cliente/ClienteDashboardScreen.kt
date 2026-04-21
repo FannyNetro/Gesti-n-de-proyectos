@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vgtech.mobile.data.local.InternalDb
+import com.vgtech.mobile.data.model.ChatMessage
 import com.vgtech.mobile.data.model.Quotation
 import com.vgtech.mobile.ui.theme.*
 import java.text.NumberFormat
@@ -83,7 +85,8 @@ fun ClienteDashboardScreen(
             ) {
                 val tabs = listOf(
                     Triple("Nosotros", Icons.Default.Business, 0),
-                    Triple("Cotizaciones", Icons.Default.RequestQuote, 1)
+                    Triple("Cotizaciones", Icons.Default.RequestQuote, 1),
+                    Triple("Chat", Icons.Default.Chat, 2)
                 )
                 tabs.forEach { (label, icon, index) ->
                     val isSelected = selectedTab == index
@@ -113,6 +116,7 @@ fun ClienteDashboardScreen(
             when (selectedTab) {
                 0 -> LandingPageView() // HU1 y HU2
                 1 -> CotizacionesView(clientQuotations) // HU3, HU4, HU5
+                2 -> ClienteChatScreen()
             }
         }
     }
@@ -418,5 +422,190 @@ private fun DetailRow(label: String, value: String, isBold: Boolean = false, col
     Column {
         Text(label, style = MaterialTheme.typography.labelSmall, color = TextMuted)
         Text(value, style = if(isBold) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium, fontWeight = if(isBold) FontWeight.ExtraBold else FontWeight.SemiBold, color = color)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  TAB 2: Chat directo con el Supervisor
+// ═══════════════════════════════════════════════════════════════════
+
+@Composable
+fun ClienteChatScreen() {
+    val currentClientUid = "cliente-uid"
+    val supervisorUid   = "sup-uid"
+
+    val allMessages by InternalDb.chatMessages.collectAsState()
+    val chatMessages = remember(allMessages) {
+        allMessages
+            .filter {
+                (it.senderUid == currentClientUid && it.receiverUid == supervisorUid) ||
+                (it.senderUid == supervisorUid   && it.receiverUid == currentClientUid)
+            }
+            .sortedBy { it.timestamp }
+    }
+
+    var messageText by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.fillMaxSize().background(BackgroundLight)) {
+
+        // ── Header del chat ───────────────────────────────────────────────
+        Surface(
+            color = SurfaceWhite,
+            shadowElevation = 3.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(Navy.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Person, contentDescription = null, tint = Navy, modifier = Modifier.size(26.dp))
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column {
+                    Text(
+                        "Supervisor VG Tech",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Navy
+                    )
+                    Text(
+                        "● En línea",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SuccessGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // ── Mensajes ──────────────────────────────────────────────────────
+        if (chatMessages.isEmpty()) {
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Chat,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = TextMuted.copy(alpha = 0.3f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "Línea directa con el supervisor",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Navy
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Consulta sobre tus proyectos, cotizaciones o cualquier duda.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(chatMessages) { msg ->
+                    val isMine = msg.senderUid == currentClientUid
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = if (isMine) Alignment.End else Alignment.Start
+                    ) {
+                        if (!isMine) {
+                            Text(
+                                "Supervisor",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted,
+                                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+                            )
+                        }
+                        Surface(
+                            color = if (isMine) Navy else SurfaceWhite,
+                            shape = RoundedCornerShape(
+                                topStart = 16.dp,
+                                topEnd = 16.dp,
+                                bottomStart = if (isMine) 16.dp else 4.dp,
+                                bottomEnd = if (isMine) 4.dp else 16.dp
+                            ),
+                            modifier = Modifier.widthIn(max = 280.dp),
+                            shadowElevation = if (isMine) 0.dp else 1.dp
+                        ) {
+                            Text(
+                                text = msg.message,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                color = if (isMine) Color.White else Navy,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Input ─────────────────────────────────────────────────────────
+        Surface(color = SurfaceWhite, shadowElevation = 4.dp, modifier = Modifier.imePadding()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    placeholder = { Text("Escribe un mensaje...") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    maxLines = 3,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Navy,
+                        focusedLabelColor = Navy
+                    )
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = {
+                        if (messageText.isNotBlank()) {
+                            InternalDb.addChatMessage(
+                                ChatMessage(
+                                    senderUid = currentClientUid,
+                                    receiverUid = supervisorUid,
+                                    projectId  = "CLI_SUP_DIRECT",
+                                    message    = messageText.trim()
+                                )
+                            )
+                            messageText = ""
+                        }
+                    },
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = Navy,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enviar")
+                }
+            }
+        }
     }
 }

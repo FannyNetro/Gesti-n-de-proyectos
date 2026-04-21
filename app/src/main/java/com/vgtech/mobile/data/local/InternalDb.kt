@@ -465,4 +465,27 @@ object InternalDb {
     fun addPerformanceEvaluation(eval: PerformanceEvaluation) {
         _evaluations.value += eval
     }
+
+    // ── Client ↔ Supervisor Project Acceptance ──────────────────────
+    fun supervisorAcceptProject(quotationId: String, projectId: String, supervisorUid: String, clientUid: String) {
+        // 1. Mark the quotation as confirmed by supervisor
+        _quotations.value = _quotations.value.map {
+            if (it.id == quotationId) it.copy(supervisorConfirmed = true) else it
+        }
+        // 2. If project is still Pendiente, activate it
+        val project = _projects.value.find { it.id == projectId }
+        if (project != null && project.status == "Pendiente") {
+            updateProject(project.copy(status = "En Progreso"))
+        }
+        // 3. Auto-send confirmation message to client
+        val projTitle = project?.title ?: "el proyecto"
+        addChatMessage(
+            ChatMessage(
+                senderUid = supervisorUid,
+                receiverUid = clientUid,
+                projectId = projectId,
+                message = "✅ Hemos aceptado oficialmente \"$projTitle\". Nuestro equipo coordinará el inicio de los trabajos. Cualquier avance o consulta, comuníquese por este medio."
+            )
+        )
+    }
 }

@@ -56,7 +56,8 @@ fun SupervisorDashboardScreen(
     val evaluations by InternalDb.evaluations.collectAsState()
 
     val consultants = employees.filter { it.puesto.lowercase() == "consultor" && it.activo }
-    val providers = employees.filter { it.puesto.lowercase() == "proveedor" && it.activo }
+    val providers   = employees.filter { it.puesto.lowercase() == "proveedor" && it.activo }
+    val clients     = employees.filter { it.puesto.lowercase() == "cliente"   && it.activo }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -107,7 +108,7 @@ fun SupervisorDashboardScreen(
                     "Avances" -> ProgressTab(projects, progressReports)
                     "Evaluar" -> EvaluationsTab(projects, consultants, providers, evaluations)
                     "Reportes" -> ReportsTab(projects, consultants, providers, progressReports, evaluations)
-                    "Chat" -> SupervisorChatTab(projects, consultants, providers)
+                    "Chat" -> SupervisorChatTab(projects, consultants, providers, clients, quotations)
                     else -> SupervisorPlaceholderContent(selectedTab)
                 }
             }
@@ -1751,63 +1752,405 @@ fun SupervisorQuotationsTab(projects: List<Project>, providers: List<Employee>) 
 // ═════════════════════════════════════════════════════════════════
 
 @Composable
-fun SupervisorChatTab(projects: List<Project>, consultants: List<Employee>, providers: List<Employee>) {
-    var selectedUserUid by remember { mutableStateOf<String?>(null) }
+fun SupervisorChatTab(
+    projects: List<Project>,
+    consultants: List<Employee>,
+    providers: List<Employee>,
+    clients: List<Employee>,
+    quotations: List<Quotation>
+) {
+    var selectedUserUid  by remember { mutableStateOf<String?>(null) }
     var selectedUserName by remember { mutableStateOf("") }
-    
+    var selectedIsClient by remember { mutableStateOf(false) }
+
     val currentSupervisorUid = "sup-uid"
 
     if (selectedUserUid != null) {
-        SupervisorChatDetailScreen(
-            supervisorUid = currentSupervisorUid,
-            otherUserUid = selectedUserUid!!,
-            otherUserName = selectedUserName,
-            onBack = { selectedUserUid = null }
-        )
+        if (selectedIsClient) {
+            SupervisorClientChatDetailScreen(
+                supervisorUid = currentSupervisorUid,
+                clientUid     = selectedUserUid!!,
+                clientName    = selectedUserName,
+                quotations    = quotations,
+                projects      = projects,
+                onBack        = { selectedUserUid = null; selectedIsClient = false }
+            )
+        } else {
+            SupervisorChatDetailScreen(
+                supervisorUid  = currentSupervisorUid,
+                otherUserUid   = selectedUserUid!!,
+                otherUserName  = selectedUserName,
+                onBack         = { selectedUserUid = null }
+            )
+        }
     } else {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-            Text("Chat Organizacional", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = Navy)
-            Text("Supervisa y comunícate con consultores y proveedores de la red.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
-            
-            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                "Chat Organizacional",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = Navy
+            )
+            Text(
+                "Comunícate con consultores, proveedores y clientes.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMuted
+            )
+            Spacer(modifier = Modifier.height(20.dp))
 
-            val allPersonnel = consultants + providers
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
 
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (allPersonnel.isEmpty()) {
-                    item { Text("No hay personal disponible.", color = TextMuted) }
-                } else {
-                    items(allPersonnel) { person ->
+                // ── Clientes (sección destacada) ───────────────────────────
+                if (clients.isNotEmpty()) {
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Business, null, tint = Teal, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "CLIENTES",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Teal
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    items(clients) { client ->
+                        // Check if there are approved quotations pending supervisor confirmation
+                        val pendingApprovals = quotations.count {
+                            it.clientStatus == "Aprobada" && !it.supervisorConfirmed
+                        }
                         Card(
-                            modifier = Modifier.fillMaxWidth().clickable { 
-                                selectedUserUid = person.uid 
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedUserUid  = client.uid
+                                selectedUserName = client.nombreCompleto
+                                selectedIsClient = true
+                            },
+                            colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+                            border = if (pendingApprovals > 0)
+                                androidx.compose.foundation.BorderStroke(1.5.dp, SuccessGreen)
+                            else null
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(48.dp).clip(CircleShape).background(Teal.copy(alpha = 0.1f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Business, null, tint = Teal)
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(client.nombreCompleto, fontWeight = FontWeight.Bold, color = Navy)
+                                    Text(
+                                        if (pendingApprovals > 0)
+                                            "$pendingApprovals proyecto(s) aprobado(s) — requiere aceptación"
+                                        else "Chat directo con el cliente",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (pendingApprovals > 0) SuccessGreen else TextMuted,
+                                        fontWeight = if (pendingApprovals > 0) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                                if (pendingApprovals > 0) {
+                                    Box(
+                                        modifier = Modifier.size(22.dp).clip(CircleShape).background(SuccessGreen),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("$pendingApprovals", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Icon(Icons.Default.ChevronRight, null, tint = TextMuted)
+                            }
+                        }
+                    }
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                }
+
+                // ── Consultores ─────────────────────────────────────
+                if (consultants.isNotEmpty()) {
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Engineering, null, tint = Navy, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "CONSULTORES",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Navy
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    items(consultants) { person ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedUserUid  = person.uid
                                 selectedUserName = person.nombreCompleto
+                                selectedIsClient = false
                             },
                             colors = CardDefaults.cardColors(containerColor = SurfaceWhite)
                         ) {
                             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = Navy.copy(alpha = 0.1f)) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Default.Person, null, tint = Navy)
-                                    }
+                                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Navy) }
                                 }
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(person.nombreCompleto, fontWeight = FontWeight.Bold, color = Navy)
-                                    Text(person.puesto.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall, color = Teal, fontWeight = FontWeight.Bold)
+                                    Text(person.puesto.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                                }
+                                Icon(Icons.Default.ChevronRight, null, tint = TextMuted)
+                            }
+                        }
+                    }
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                }
+
+                // ── Proveedores ─────────────────────────────────────
+                if (providers.isNotEmpty()) {
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Handyman, null, tint = Mustard, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "PROVEEDORES",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Mustard
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    items(providers) { person ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedUserUid  = person.uid
+                                selectedUserName = person.nombreCompleto
+                                selectedIsClient = false
+                            },
+                            colors = CardDefaults.cardColors(containerColor = SurfaceWhite)
+                        ) {
+                            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = Mustard.copy(alpha = 0.1f)) {
+                                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Mustard) }
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(person.nombreCompleto, fontWeight = FontWeight.Bold, color = Navy)
+                                    Text(person.puesto.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall, color = TextMuted)
                                 }
                                 Icon(Icons.Default.ChevronRight, null, tint = TextMuted)
                             }
                         }
                     }
                 }
+
+                if (clients.isEmpty() && consultants.isEmpty() && providers.isEmpty()) {
+                    item { Text("No hay contactos disponibles.", color = TextMuted) }
+                }
             }
         }
     }
 }
 
+// ═════════════════════════════════════════════════════════════════
+//  Chat Supervisor ↔ Cliente  (con panel de aceptación de proyecto)
+// ═════════════════════════════════════════════════════════════════
+@Composable
+fun SupervisorClientChatDetailScreen(
+    supervisorUid : String,
+    clientUid     : String,
+    clientName    : String,
+    quotations    : List<Quotation>,
+    projects      : List<Project>,
+    onBack        : () -> Unit
+) {
+    val allMessages by InternalDb.chatMessages.collectAsState()
+    val chatMessages = remember(allMessages) {
+        allMessages.filter {
+            (it.senderUid == supervisorUid && it.receiverUid == clientUid) ||
+            (it.senderUid == clientUid     && it.receiverUid == supervisorUid)
+        }.sortedBy { it.timestamp }
+    }
+
+    // Quotations the client approved but supervisor hasn't confirmed yet
+    val pendingApprovalPairs = remember(quotations, projects) {
+        quotations
+            .filter { it.clientStatus == "Aprobada" && !it.supervisorConfirmed }
+            .mapNotNull { q -> projects.find { p -> p.id == q.projectId }?.let { p -> Pair(q, p) } }
+    }
+
+    var messageText by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.fillMaxSize().background(SurfaceGray)) {
+
+        // ── Top bar ───────────────────────────────────────────────
+        Surface(color = SurfaceWhite, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Navy) }
+                Box(
+                    modifier = Modifier.size(36.dp).clip(CircleShape).background(Teal.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) { Icon(Icons.Default.Business, null, tint = Teal, modifier = Modifier.size(20.dp)) }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(clientName, fontWeight = FontWeight.Bold, color = Navy)
+                    Text("Cliente · Chat Directo", style = MaterialTheme.typography.labelSmall, color = Teal, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // ── Panel de proyectos aprobados ────────────────────────────
+        if (pendingApprovalPairs.isNotEmpty()) {
+            Surface(
+                color = SuccessGreen.copy(alpha = 0.07f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Notifications, null, tint = SuccessGreen, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "El cliente aprobó ${pendingApprovalPairs.size} cotización(es) — pendiente de aceptar",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = SuccessGreen
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    pendingApprovalPairs.forEach { (quotation, project) ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(10.dp),
+                            elevation = CardDefaults.cardElevation(1.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(project.title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Navy)
+                                    Text(
+                                        "Monto: $${String.format("%,.0f", quotation.amount)} · ${quotation.estimatedDays} días",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextMuted
+                                    )
+                                    Text(
+                                        "Estado del proyecto: ${project.status}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (project.status == "Pendiente") WarningAmber else SuccessGreen,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    onClick = {
+                                        InternalDb.supervisorAcceptProject(
+                                            quotationId    = quotation.id,
+                                            projectId      = project.id,
+                                            supervisorUid  = supervisorUid,
+                                            clientUid      = clientUid
+                                        )
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Aceptar", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Mensajes ───────────────────────────────────────────────
+        LazyColumn(
+            modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (chatMessages.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier.fillParentMaxWidth().height(180.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Chat, null, tint = TextMuted.copy(alpha = 0.3f), modifier = Modifier.size(44.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Inicia la conversación con el cliente", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+            items(chatMessages) { msg ->
+                val isMine = msg.senderUid == supervisorUid
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = if (isMine) Alignment.CenterEnd else Alignment.CenterStart) {
+                    Surface(
+                        color = if (isMine) Navy else Color.White,
+                        shape = RoundedCornerShape(
+                            topStart = 16.dp, topEnd = 16.dp,
+                            bottomStart = if (isMine) 16.dp else 0.dp,
+                            bottomEnd   = if (isMine) 0.dp  else 16.dp
+                        ),
+                        modifier = Modifier.widthIn(max = 280.dp)
+                    ) {
+                        Text(
+                            text = msg.message,
+                            modifier = Modifier.padding(12.dp),
+                            color = if (isMine) Color.White else Navy,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── Input ───────────────────────────────────────────────
+        Surface(color = SurfaceWhite, modifier = Modifier.imePadding()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    placeholder = { Text("Escribe un mensaje al cliente...") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(24.dp),
+                    maxLines = 3
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = {
+                        if (messageText.isNotBlank()) {
+                            InternalDb.addChatMessage(ChatMessage(
+                                senderUid   = supervisorUid,
+                                receiverUid = clientUid,
+                                projectId   = "SUP_CLI_DIRECT",
+                                message     = messageText.trim()
+                            ))
+                            messageText = ""
+                        }
+                    },
+                    colors = IconButtonDefaults.iconButtonColors(containerColor = Navy, contentColor = Color.White),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, null)
+                }
+            }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  Chat estándar Supervisor ↔ Consultor/Proveedor
+// ═════════════════════════════════════════════════════════════════
 @Composable
 fun SupervisorChatDetailScreen(supervisorUid: String, otherUserUid: String, otherUserName: String, onBack: () -> Unit) {
     val allMessages by InternalDb.chatMessages.collectAsState()

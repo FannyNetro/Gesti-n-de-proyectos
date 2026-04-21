@@ -49,7 +49,7 @@ fun ProviderPayableScreen(
     val error by viewModel.error.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Por Pagar", "Pagadas", "Historial")
+    val tabs = listOf("Por Pagar", "Pagadas", "Historial", "Inmobiliaria")
 
     var showDialog by remember { mutableStateOf(false) }
     var selectedProvider by remember { mutableStateOf<ProviderAccountSummary?>(null) }
@@ -130,6 +130,7 @@ fun ProviderPayableScreen(
                 transactions = allTransactions,
                 providerNames = providerNames
             )
+            3 -> InmobiliariaTab(summaries = summaries)
         }
     }
 }
@@ -484,6 +485,303 @@ private fun FinancialColumn(label: String, amount: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = label, style = MaterialTheme.typography.labelSmall, color = TextMuted, fontSize = 10.sp)
         Text(text = amount, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TAB: INMOBILIARIA — Ganancias de la Empresa
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun InmobiliariaTab(summaries: List<ProviderAccountSummary>) {
+    val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+
+    // Totales globales
+    val totalClientRevenue  = summaries.sumOf { it.totalServiceAmountEarned + it.totalCompanyProfit }
+    val totalProviderPaid   = summaries.sumOf { it.totalServiceAmountEarned }   // 50% proveedor
+    val totalCompanyEarned  = summaries.sumOf { it.totalCompanyProfit }          // 50% empresa
+    val totalPendingProv    = summaries.sumOf { it.pendingBalance }              // aún por pagar a proveedores
+    val netAfterPending     = totalCompanyEarned                                 // la ganancia de empresa no cambia con lo pendiente
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF4F6FB)),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+
+        // ── Tarjeta Resumen Global ─────────────────────────────────────────
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1B2A)),
+                elevation = CardDefaults.cardElevation(6.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFF00D4AA).copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.AccountBalance,
+                                contentDescription = null,
+                                tint = Color(0xFF00D4AA),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                "VG Tech · Ganancias Totales",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                            Text(
+                                "50% de cada pago del cliente",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Ingreso total de clientes
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Ingresos Totales de Clientes", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+                        Text(fmt.format(totalClientRevenue), fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Parte de Proveedores (50%)", style = MaterialTheme.typography.bodySmall, color = Color(0xFFFF7676).copy(alpha = 0.85f))
+                        Text(fmt.format(totalProviderPaid), fontWeight = FontWeight.Bold, color = Color(0xFFFF7676))
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Ganancia Neta Inmobiliaria", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = Color(0xFF00D4AA))
+                        Text(
+                            fmt.format(netAfterPending),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF00D4AA)
+                        )
+                    }
+
+                    if (totalPendingProv > 0) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFFF7676).copy(alpha = 0.10f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Warning, null, tint = Color(0xFFFF7676), modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "Deuda pendiente con proveedores: ${fmt.format(totalPendingProv)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFFF7676)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Mini barras de relación cliente → empresa ──────────────────────
+        item {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = Color(0xFF5C6BC0).copy(alpha = 0.08f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Info, null, tint = Color(0xFF5C6BC0), modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Por cada peso que paga el cliente, el 50% es ganancia de la inmobiliaria y el 50% se destina al proveedor ejecutor.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF5C6BC0)
+                    )
+                }
+            }
+        }
+
+        // ── Desglose por Proveedor ─────────────────────────────────────────
+        item {
+            Text(
+                "Desglose por Proveedor",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = Navy
+            )
+        }
+
+        if (summaries.isEmpty()) {
+            item {
+                EmptyState(icon = Icons.Default.BarChart, message = "Sin transacciones registradas aún")
+            }
+        } else {
+            items(summaries.filter { it.totalCompanyProfit > 0 || it.totalServiceAmountEarned > 0 }, key = { it.providerId }) { summary ->
+                InmobiliariaProviderCard(summary = summary, fmt = fmt)
+            }
+            if (summaries.all { it.totalCompanyProfit == 0.0 && it.totalServiceAmountEarned == 0.0 }) {
+                item {
+                    EmptyState(icon = Icons.Default.BarChart, message = "Sin ingresos registrados aún")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InmobiliariaProviderCard(summary: ProviderAccountSummary, fmt: NumberFormat) {
+    val totalClientForProvider = summary.totalServiceAmountEarned + summary.totalCompanyProfit
+    val pctEmpresa = if (totalClientForProvider > 0)
+        (summary.totalCompanyProfit / totalClientForProvider).toFloat().coerceIn(0f, 1f)
+    else 0f
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF43A047).copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Store, null, tint = Color(0xFF43A047), modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        summary.providerName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Navy
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("Ganancia", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                    Text(
+                        fmt.format(summary.totalCompanyProfit),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF43A047)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Barra de distribución cliente ↔ empresa / proveedor
+            Text("Distribución del ingreso del cliente", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(Color(0xFFFF7676).copy(alpha = 0.25f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(pctEmpresa)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(Color(0xFF43A047))
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF43A047)))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Empresa ${(pctEmpresa * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = Color(0xFF43A047), fontWeight = FontWeight.Bold)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFF7676)))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Proveedor ${(100 - (pctEmpresa * 100).toInt())}%", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFF7676), fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = Color(0xFFF0F0F0))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                FinancialColumn(label = "Total Cliente Pagó", amount = fmt.format(totalClientForProvider), color = Color(0xFF5C6BC0))
+                FinancialColumn(label = "Parte Proveedor", amount = fmt.format(summary.totalServiceAmountEarned), color = Color(0xFFE53935))
+                FinancialColumn(label = "Ganancia Inmob.", amount = fmt.format(summary.totalCompanyProfit), color = Color(0xFF43A047))
+            }
+
+            if (summary.pendingBalance > 0) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFF7676).copy(alpha = 0.07f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.PendingActions, null, tint = Color(0xFFE53935), modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "Pendiente por pagar al proveedor: ${fmt.format(summary.pendingBalance)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFE53935)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
