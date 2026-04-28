@@ -450,13 +450,23 @@ private fun ProviderAccountCard(
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
-                        onClick = onAddService, modifier = Modifier.fillMaxWidth(),
+                        onClick = onAddService, modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF5C6BC0)),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF5C6BC0))
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF5C6BC0)),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
                         Icon(Icons.Default.AddCard, null, modifier = Modifier.size(15.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Registrar Abono del Cliente", style = MaterialTheme.typography.labelSmall)
+                        Text("Abono Cliente", style = MaterialTheme.typography.labelSmall)
+                    }
+                    Button(
+                        onClick = onAddPayment, modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Teal),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        Icon(Icons.Default.AttachMoney, null, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Pagar Proveedor", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -782,6 +792,15 @@ fun ManagePhasesDialog(
 ) {
     var showAddForm by remember { mutableStateOf(false) }
     val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+    
+    val totalProjectAmount = remember(availableProjects) {
+        if (availableProjects.size == 1) {
+            val projId = availableProjects.first().id
+            com.vgtech.mobile.data.local.InternalDb.providerTransactions.value
+                .filter { it.projectId == projId && it.type == com.vgtech.mobile.data.model.TransactionType.SERVICE }
+                .sumOf { it.providerCut }
+        } else 0.0
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -792,6 +811,7 @@ fun ManagePhasesDialog(
                     AddPhaseForm(
                         providerId = provider.providerId,
                         projects = availableProjects,
+                        totalProjectAmount = totalProjectAmount,
                         onCancel = { showAddForm = false },
                         onSave = { onAddPhase(it); showAddForm = false }
                     )
@@ -835,6 +855,7 @@ fun ManagePhasesDialog(
 fun AddPhaseForm(
     providerId: String,
     projects: List<Project>,
+    totalProjectAmount: Double,
     onCancel: () -> Unit,
     onSave: (PaymentPhase) -> Unit
 ) {
@@ -851,7 +872,13 @@ fun AddPhaseForm(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Nueva Fase de Pago", fontWeight = FontWeight.Bold, color = Teal)
 
-        OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Monto ($)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
+        if (totalProjectAmount > 0) {
+            val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+            Text("Total a pagar del proyecto: ${fmt.format(totalProjectAmount)}", style = MaterialTheme.typography.labelSmall, color = Navy, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+
+        OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Abono Acordado ($)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(value = phaseNum, onValueChange = { phaseNum = it }, label = { Text("Fase #") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
             OutlinedTextField(value = totalPhases, onValueChange = { totalPhases = it }, label = { Text("Total Fases") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
