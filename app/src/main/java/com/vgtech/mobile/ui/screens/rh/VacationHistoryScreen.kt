@@ -15,6 +15,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.SecondaryIndicator
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,10 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.vgtech.mobile.data.local.InternalDb
-import com.vgtech.mobile.data.model.Employee
-import com.vgtech.mobile.data.model.VacationRequest
-import com.vgtech.mobile.data.model.VacationStatus
-import com.vgtech.mobile.data.model.WorkLog
+import com.vgtech.mobile.data.model.*
 import com.vgtech.mobile.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -62,7 +61,7 @@ fun VacationHistoryScreen() {
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    "Vacaciones y Nómina",
+                    "Gestión de Días y Nómina",
                     style = MaterialTheme.typography.headlineSmall,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
@@ -145,14 +144,15 @@ fun VacationHistoryScreen() {
     }
 
     selectedEmployeeState.value?.let { employee ->
-        AddVacationDialog(
+        ManageEmployeeDaysDialog(
             employee = employee,
             onDismiss = { selectedEmployeeState.value = null },
-            onConfirm = { request ->
+            onConfirmRequest = { request ->
                 InternalDb.addVacationRequest(request)
-                if (request.status == VacationStatus.APPROVED) {
-                    InternalDb.updateEmployee(employee.copy(diasVacaciones = employee.diasVacaciones - request.effectiveDays))
-                }
+                selectedEmployeeState.value = null
+            },
+            onAdjustBalance = { newBalance ->
+                InternalDb.updateEmployee(employee.copy(diasVacaciones = newBalance))
                 selectedEmployeeState.value = null
             }
         )
@@ -179,7 +179,7 @@ fun EmployeeVacationRow(employee: Employee, onClick: () -> Unit) {
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("${employee.diasVacaciones}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = if (employee.diasVacaciones > 0) Teal else ErrorRed)
-                Text("disponibles", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                Text("vacaciones disp.", style = MaterialTheme.typography.labelSmall, color = TextMuted)
             }
         }
     }
@@ -203,6 +203,7 @@ fun VacationRequestItem(request: VacationRequest) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(request.employeeName, fontWeight = FontWeight.Bold, color = Navy)
+                    Text(request.type.label, style = MaterialTheme.typography.labelSmall, color = Teal, fontWeight = FontWeight.Bold)
                     Text("Solicitado: ${sdf.format(Date(request.requestDate))}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 }
                 Surface(color = color.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
@@ -241,47 +242,13 @@ fun VacationRequestItem(request: VacationRequest) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (VacationRequest) -> Unit) {
-    var startDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var endDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var observations by remember { mutableStateOf("") }
-    var requestType by remember { mutableStateOf("Vacaciones") }
-    var hoursInput by remember { mutableStateOf("") }
-    var expandedType by remember { mutableStateOf(false) }
-    
-    val context = LocalContext.current
-    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-
-    val availableHours = employee.diasVacaciones * 8.0
-    val requestedHours = if (requestType == "Horas trabajadas") hoursInput.toDoubleOrNull() ?: 0.0 else 0.0
-    val isInvalidHours = requestedHours > availableHours
-
-    // ── Lógica de Cálculo de Días ──────────────────────────
-    val effectiveDays = remember(startDate, endDate, requestType, requestedHours) {
-        if (requestType == "Horas trabajadas") {
-            requestedHours / 8.0
-        } else {
-            if (endDate < startDate) return@remember 0.0
-            
-            val cal = Calendar.getInstance()
-            cal.timeInMillis = startDate
-            val endCal = Calendar.getInstance()
-            endCal.timeInMillis = endDate
-            
-            var total = 0.0
-            while (!cal.after(endCal)) {
-                when (cal.get(Calendar.DAY_OF_WEEK)) {
-                    Calendar.SATURDAY -> total += 0.5
-                    Calendar.SUNDAY -> { /* No cuenta */ }
-                    else -> total += 1.0
-                }
-                cal.add(Calendar.DAY_OF_MONTH, 1)
-            }
-            total
-        }
-    }
-
-    val saldoRestante = (employee.diasVacaciones - effectiveDays)
+fun ManageEmployeeDaysDialog(
+    employee: Employee,
+    onDismiss: () -> Unit,
+    onConfirmRequest: (VacationRequest) -> Unit,
+    onAdjustBalance: (Double) -> Unit
+) {
+    var tabIndex by remember { mutableIntStateOf(0) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -298,152 +265,256 @@ fun AddVacationDialog(employee: Employee, onDismiss: () -> Unit, onConfirm: (Vac
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("Nueva Solicitud", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
+                Text("Gestión de Días", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
                 
-                // 1. Info del empleado
+                // Info del empleado
                 Column(modifier = Modifier.fillMaxWidth().background(SurfaceGray, RoundedCornerShape(12.dp)).padding(12.dp)) {
                     Text("Empleado: ${employee.nombreCompleto}", fontWeight = FontWeight.Bold, color = Navy)
                     Text("Puesto: ${employee.puesto}", style = MaterialTheme.typography.bodySmall)
-                    Text("Horas disponibles: $availableHours", fontWeight = FontWeight.ExtraBold, color = Teal)
-                    Text("Días disponibles: ${employee.diasVacaciones}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                    Text("Vacaciones actuales: ${employee.diasVacaciones} días", fontWeight = FontWeight.ExtraBold, color = Teal)
                 }
 
-                // 2. Formulario - Dropdown List for request type
-                Text("Tipo de Solicitud", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                
-                ExposedDropdownMenuBox(
-                    expanded = expandedType,
-                    onExpandedChange = { expandedType = !expandedType },
-                    modifier = Modifier.fillMaxWidth()
+                TabRow(
+                    selectedTabIndex = tabIndex,
+                    containerColor = Color.Transparent,
+                    contentColor = Teal,
+                    indicator = { tabPositions ->
+                        SecondaryIndicator(Modifier.tabIndicatorOffset(tabPositions[tabIndex]), color = Teal)
+                    }
                 ) {
-                    OutlinedTextField(
-                        value = requestType,
-                        onValueChange = {},
-                        readOnly = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedType) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Teal,
-                            unfocusedBorderColor = Color.LightGray
-                        )
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expandedType,
-                        onDismissRequest = { expandedType = false }
-                    ) {
-                        listOf("Vacaciones", "Horas trabajadas", "Permiso Especial").forEach { type ->
-                            DropdownMenuItem(
-                                text = { Text(type) },
-                                onClick = {
-                                    requestType = type
-                                    expandedType = false
-                                }
-                            )
-                        }
+                    Tab(selected = tabIndex == 0, onClick = { tabIndex = 0 }) {
+                        Text("Registrar Ausencia", modifier = Modifier.padding(vertical = 12.dp))
+                    }
+                    Tab(selected = tabIndex == 1, onClick = { tabIndex = 1 }) {
+                        Text("Ajustar Saldo", modifier = Modifier.padding(vertical = 12.dp))
                     }
                 }
 
-                if (requestType == "Horas trabajadas") {
-                    OutlinedTextField(
-                        value = hoursInput,
-                        onValueChange = { hoursInput = it },
-                        label = { Text("Horas a solicitar") },
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        isError = isInvalidHours,
-                        supportingText = {
-                            if (isInvalidHours) {
-                                Text("No puedes pedir más horas de las disponibles ($availableHours)", color = ErrorRed)
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                if (tabIndex == 0) {
+                    AddRequestContent(employee, onConfirmRequest)
+                } else {
+                    AdjustBalanceContent(employee, onAdjustBalance)
                 }
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Fecha Inicio", style = MaterialTheme.typography.labelSmall)
-                        Box(modifier = Modifier.fillMaxWidth().border(1.dp, Color.LightGray, RoundedCornerShape(8.dp)).clickable {
-                            val c = Calendar.getInstance().apply { timeInMillis = startDate }
-                            DatePickerDialog(context, { _, y, m, d ->
-                                startDate = Calendar.getInstance().apply { set(y, m, d, 0, 0, 0) }.timeInMillis
-                                if (requestType == "Horas trabajadas") endDate = startDate
-                            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
-                        }.padding(12.dp)) {
-                            Text(sdf.format(Date(startDate)))
-                        }
-                    }
-                    if (requestType != "Horas trabajadas") {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Fecha Fin", style = MaterialTheme.typography.labelSmall)
-                            Box(modifier = Modifier.fillMaxWidth().border(1.dp, Color.LightGray, RoundedCornerShape(8.dp)).clickable {
-                                val c = Calendar.getInstance().apply { timeInMillis = endDate }
-                                DatePickerDialog(context, { _, y, m, d ->
-                                    endDate = Calendar.getInstance().apply { set(y, m, d, 0, 0, 0) }.timeInMillis
-                                }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
-                            }.padding(12.dp)) {
-                                Text(sdf.format(Date(endDate)))
-                            }
-                        }
-                    }
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                    Text("Cerrar")
                 }
+            }
+        }
+    }
+}
 
-                OutlinedTextField(
-                    value = observations,
-                    onValueChange = { observations = it },
-                    label = { Text("Comentario (opcional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddRequestContent(employee: Employee, onConfirm: (VacationRequest) -> Unit) {
+    val requests by InternalDb.vacationRequests.collectAsState()
+    val approvedRequests = requests.filter { it.employeeUid == employee.uid && it.status == VacationStatus.APPROVED }
+    
+    val usedConGoce = approvedRequests.filter { it.type == RequestType.CON_GOCE }.sumOf { it.effectiveDays }
+    val usedSinGoce = approvedRequests.filter { it.type == RequestType.SIN_GOCE }.sumOf { it.effectiveDays }
 
-                // 3. Resumen Automático
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = (if (isInvalidHours) ErrorRed else Teal).copy(alpha = 0.05f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, (if (isInvalidHours) ErrorRed else Teal).copy(alpha = 0.2f))
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text(if (requestType == "Horas trabajadas") "Horas equivalentes (días):" else "Días solicitados:")
-                            Text("$effectiveDays", fontWeight = FontWeight.ExtraBold, color = if (isInvalidHours) ErrorRed else Teal)
-                        }
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text("Saldo anterior:", style = MaterialTheme.typography.bodySmall)
-                            Text("${employee.diasVacaciones}", style = MaterialTheme.typography.bodySmall)
-                        }
-                        HorizontalDivider(color = (if (isInvalidHours) ErrorRed else Teal).copy(alpha = 0.1f))
-                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text("Saldo restante:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                            Text("$saldoRestante", fontWeight = FontWeight.ExtraBold, color = if (saldoRestante >= 0) Teal else ErrorRed)
-                        }
-                    }
+    var startDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var endDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var observations by remember { mutableStateOf("") }
+    var requestType by remember { mutableStateOf(RequestType.VACACIONES) }
+    var isHourly by remember { mutableStateOf(false) }
+    var hoursInput by remember { mutableStateOf("") }
+    var expandedType by remember { mutableStateOf(false) }
+    
+    val context = LocalContext.current
+    val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+
+    val availableHours = employee.diasVacaciones * 8.0
+    val requestedHours = if (isHourly) hoursInput.toDoubleOrNull() ?: 0.0 else 0.0
+    
+    // Total Limits minus already used
+    val currentLimit = when(requestType) {
+        RequestType.VACACIONES -> employee.diasVacaciones
+        RequestType.CON_GOCE -> (1.0 - usedConGoce).coerceAtLeast(0.0)
+        RequestType.SIN_GOCE -> (3.0 - usedSinGoce).coerceAtLeast(0.0)
+    }
+
+    val isInvalidHours = requestType == RequestType.VACACIONES && requestedHours > availableHours
+
+    val effectiveDays = remember(startDate, endDate, isHourly, requestedHours) {
+        if (isHourly) {
+            requestedHours / 8.0
+        } else {
+            if (endDate < startDate) return@remember 0.0
+            val cal = Calendar.getInstance().apply { timeInMillis = startDate }
+            val endCal = Calendar.getInstance().apply { timeInMillis = endDate }
+            var total = 0.0
+            while (!cal.after(endCal)) {
+                when (cal.get(Calendar.DAY_OF_WEEK)) {
+                    Calendar.SATURDAY -> total += 0.5
+                    Calendar.SUNDAY -> { /* Skip */ }
+                    else -> total += 1.0
                 }
+                cal.add(Calendar.DAY_OF_MONTH, 1)
+            }
+            total
+        }
+    }
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cerrar") }
-                    Button(
+    val saldoRestante = (currentLimit - effectiveDays).coerceAtLeast(0.0)
+    val isLimitExceeded = effectiveDays > currentLimit
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Tipo de Solicitud", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        
+        ExposedDropdownMenuBox(
+            expanded = expandedType,
+            onExpandedChange = { expandedType = !expandedType },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = requestType.label,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedType) },
+                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+            ExposedDropdownMenu(
+                expanded = expandedType,
+                onDismissRequest = { expandedType = false }
+            ) {
+                RequestType.values().forEach { type ->
+                    DropdownMenuItem(
+                        text = { Text(type.label) },
                         onClick = {
-                            onConfirm(VacationRequest(
-                                employeeUid = employee.uid,
-                                employeeName = employee.nombreCompleto,
-                                startDate = startDate,
-                                endDate = if (requestType == "Horas trabajadas") startDate else endDate,
-                                daysRequested = if (requestType == "Horas trabajadas") 0 else effectiveDays.toInt(),
-                                hoursRequested = requestedHours,
-                                observations = observations,
-                                status = VacationStatus.PENDING
-                            ))
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = if (isInvalidHours) ErrorRed else Teal),
-                        enabled = effectiveDays > 0 && !isInvalidHours
-                    ) {
-                        Text("Enviar")
+                            requestType = type
+                            expandedType = false
+                        }
+                    )
+                }
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = isHourly, onCheckedChange = { isHourly = it })
+            Text("¿Solicitar por horas?", style = MaterialTheme.typography.bodyMedium)
+        }
+
+        if (isHourly) {
+            OutlinedTextField(
+                value = hoursInput,
+                onValueChange = { if (it.isEmpty() || it.toDoubleOrNull() != null) hoursInput = it },
+                label = { Text("Horas") },
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                isError = isInvalidHours,
+                supportingText = { if (isInvalidHours) Text("Excede disponible", color = ErrorRed) },
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Fecha Inicio", style = MaterialTheme.typography.labelSmall)
+                Box(modifier = Modifier.fillMaxWidth().border(1.dp, Color.LightGray, RoundedCornerShape(8.dp)).clickable {
+                    val c = Calendar.getInstance().apply { timeInMillis = startDate }
+                    DatePickerDialog(context, { _, y, m, d ->
+                        startDate = Calendar.getInstance().apply { set(y, m, d, 0, 0, 0) }.timeInMillis
+                        if (isHourly) endDate = startDate
+                    }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+                }.padding(12.dp)) {
+                    Text(sdf.format(Date(startDate)))
+                }
+            }
+            if (!isHourly) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Fecha Fin", style = MaterialTheme.typography.labelSmall)
+                    Box(modifier = Modifier.fillMaxWidth().border(1.dp, Color.LightGray, RoundedCornerShape(8.dp)).clickable {
+                        val c = Calendar.getInstance().apply { timeInMillis = endDate }
+                        DatePickerDialog(context, { _, y, m, d ->
+                            endDate = Calendar.getInstance().apply { set(y, m, d, 0, 0, 0) }.timeInMillis
+                        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+                    }.padding(12.dp)) {
+                        Text(sdf.format(Date(endDate)))
                     }
                 }
             }
+        }
+
+        OutlinedTextField(
+            value = observations,
+            onValueChange = { observations = it },
+            label = { Text("Comentario") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        val errorStatus = isInvalidHours || isLimitExceeded
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = (if (errorStatus) ErrorRed else Teal).copy(alpha = 0.05f),
+            shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, (if (errorStatus) ErrorRed else Teal).copy(alpha = 0.2f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (isHourly) "Horas en días:" else "Días solicitados:")
+                    Text("$effectiveDays", fontWeight = FontWeight.ExtraBold, color = if (errorStatus) ErrorRed else Teal)
+                }
+                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Text("Días restantes:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                    Text("$saldoRestante", fontWeight = FontWeight.ExtraBold, color = if (saldoRestante > 0 || !isLimitExceeded) Teal else ErrorRed)
+                }
+                if (isLimitExceeded) {
+                    val maxPossible = if (requestType == RequestType.VACACIONES) employee.diasVacaciones else if (requestType == RequestType.CON_GOCE) 1.0 - usedConGoce else 3.0 - usedSinGoce
+                    Text("No puedes solicitar más de ${maxPossible.coerceAtLeast(0.0)} días para este tipo de ausencia.", style = MaterialTheme.typography.labelSmall, color = ErrorRed, fontWeight = FontWeight.Bold)
+                } else if (requestType != RequestType.VACACIONES) {
+                    Text("Nota: Este tipo de ausencia no afecta el saldo acumulado.", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                }
+            }
+        }
+
+        Button(
+            onClick = {
+                onConfirm(VacationRequest(
+                    employeeUid = employee.uid,
+                    employeeName = employee.nombreCompleto,
+                    startDate = startDate,
+                    endDate = if (isHourly) startDate else endDate,
+                    daysRequested = if (isHourly) 0.0 else effectiveDays,
+                    hoursRequested = requestedHours,
+                    type = requestType,
+                    observations = observations,
+                    status = VacationStatus.PENDING
+                ))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = if (errorStatus) ErrorRed else Teal),
+            enabled = effectiveDays > 0 && !errorStatus
+        ) {
+            Text("Registrar")
+        }
+    }
+}
+
+@Composable
+fun AdjustBalanceContent(employee: Employee, onAdjust: (Double) -> Unit) {
+    var balanceInput by remember { mutableStateOf(employee.diasVacaciones.toString()) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("Modificar saldo de vacaciones directamente.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+        
+        OutlinedTextField(
+            value = balanceInput,
+            onValueChange = { if (it.isEmpty() || it.toDoubleOrNull() != null) balanceInput = it },
+            label = { Text("Nuevo saldo (días)") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        Button(
+            onClick = { onAdjust(balanceInput.toDoubleOrNull() ?: employee.diasVacaciones) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Navy)
+        ) {
+            Text("Actualizar Saldo")
         }
     }
 }
@@ -464,7 +535,7 @@ fun PayrollView(employees: List<Employee>, requests: List<VacationRequest>) {
                     color = Navy
                 )
                 Text(
-                    "Resumen de sueldos, horas extras y deducciones",
+                    "Resumen de sueldos y ausencias",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMuted
                 )
@@ -472,17 +543,19 @@ fun PayrollView(employees: List<Employee>, requests: List<VacationRequest>) {
         }
 
         items(employees) { employee ->
-            val daysTaken = requests.filter { it.employeeUid == employee.uid && it.status == VacationStatus.APPROVED }
-                .sumOf { it.effectiveDays }
+            val empRequests = requests.filter { it.employeeUid == employee.uid && it.status == VacationStatus.APPROVED }
+            val vacationDays = empRequests.filter { it.type == RequestType.VACACIONES }.sumOf { it.effectiveDays }
+            val paidLeaveDays = empRequests.filter { it.type == RequestType.CON_GOCE }.sumOf { it.effectiveDays }
+            val unpaidLeaveDays = empRequests.filter { it.type == RequestType.SIN_GOCE }.sumOf { it.effectiveDays }
             
-            PayrollCard(employee, daysTaken)
+            PayrollCard(employee, vacationDays, paidLeaveDays, unpaidLeaveDays)
         }
     }
 }
 
 @Composable
-fun PayrollCard(employee: Employee, daysTaken: Double) {
-    var isExpanded by remember { mutableStateOf(employee.uid == "admin-uid") } // Expanded by default for first user in screenshot
+fun PayrollCard(employee: Employee, vacationDays: Double, paidLeave: Double, unpaidLeave: Double) {
+    var isExpanded by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
@@ -517,13 +590,14 @@ fun PayrollCard(employee: Employee, daysTaken: Double) {
                 }
                 
                 Column(horizontalAlignment = Alignment.End) {
+                    val finalPay = employee.sueldo - (unpaidLeave * (employee.sueldo / 30.0))
                     Text(
-                        "$${String.format("%,.2f", employee.sueldo)}",
+                        "$${String.format("%,.2f", finalPay)}",
                         fontWeight = FontWeight.Bold,
                         color = Teal,
                         fontSize = 18.sp
                     )
-                    Text("Total nómina", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                    Text("Total a pagar", style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 }
             }
 
@@ -533,20 +607,24 @@ fun PayrollCard(employee: Employee, daysTaken: Double) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 PayrollDetailRow("Sueldo base mensual", "$${String.format("%,.2f", employee.sueldo)}")
-                PayrollDetailRow("Pago por hora", "$${String.format("%.2f", employee.pagoPorHora)}/h")
-                PayrollDetailRow("Horas regulares registradas", "0.0h") // Placeholder
-                PayrollDetailRow("Días vacaciones tomados", "${daysTaken.toInt()} días")
-                PayrollDetailRow("Días vacaciones disponibles", "${employee.diasVacaciones.toInt()} días")
+                PayrollDetailRow("Vacaciones tomadas", "$vacationDays días")
+                PayrollDetailRow("Días con goce de sueldo", "$paidLeave días")
+                PayrollDetailRow("Días sin goce de sueldo", "$unpaidLeave días")
+                
+                if (unpaidLeave > 0) {
+                    val deduction = unpaidLeave * (employee.sueldo / 30.0)
+                    PayrollDetailRow("Deducción (días sin goce)", "-$${String.format("%,.2f", deduction)}")
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                    verticalAlignment = Alignment.CenterVertically) {
                     Text("TOTAL NÓMINA", fontWeight = FontWeight.ExtraBold, color = Navy, fontSize = 16.sp)
+                    val finalPay = employee.sueldo - (unpaidLeave * (employee.sueldo / 30.0))
                     Text(
-                        "$${String.format("%,.2f", employee.sueldo)}",
+                        "$${String.format("%,.2f", finalPay)}",
                         fontWeight = FontWeight.ExtraBold,
                         color = Teal,
                         fontSize = 16.sp

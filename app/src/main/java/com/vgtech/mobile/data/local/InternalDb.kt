@@ -145,7 +145,7 @@ object InternalDb {
     fun updateVacationStatus(requestId: String, status: VacationStatus) {
         val request = _vacationRequests.value.find { it.id == requestId } ?: return
         updateVacationRequest(request.copy(status = status))
-        if (status == VacationStatus.APPROVED) {
+        if (status == VacationStatus.APPROVED && request.type == RequestType.VACACIONES) {
             getEmployeeById(request.employeeUid)?.let { updateEmployee(it.copy(diasVacaciones = it.diasVacaciones - request.effectiveDays)) }
         }
     }
