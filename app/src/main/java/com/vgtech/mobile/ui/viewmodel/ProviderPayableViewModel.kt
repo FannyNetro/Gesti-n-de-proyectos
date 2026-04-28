@@ -3,16 +3,14 @@ package com.vgtech.mobile.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.vgtech.mobile.data.model.Employee
-import com.vgtech.mobile.data.model.ProviderAccountSummary
-import com.vgtech.mobile.data.model.ProviderTransaction
-import com.vgtech.mobile.data.model.TransactionType
+import com.vgtech.mobile.data.local.InternalDb
+import com.vgtech.mobile.data.model.*
 import com.vgtech.mobile.data.repository.EmployeeRepository
 import com.vgtech.mobile.data.repository.ProviderPayableRepository
-import com.vgtech.mobile.data.repository.ProviderTxDb
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class ProviderPayableViewModel(application: Application) : AndroidViewModel(application) {
@@ -26,88 +24,118 @@ class ProviderPayableViewModel(application: Application) : AndroidViewModel(appl
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    // Resumen de las cuentas de todos los proveedores
     private val _providerSummaries = MutableStateFlow<List<ProviderAccountSummary>>(emptyList())
     val providerSummaries: StateFlow<List<ProviderAccountSummary>> = _providerSummaries.asStateFlow()
 
-    // All transactions for the global history view
     private val _allTransactions = MutableStateFlow<List<ProviderTransaction>>(emptyList())
     val allTransactions: StateFlow<List<ProviderTransaction>> = _allTransactions.asStateFlow()
 
-    // Map from providerId -> providerName for history display
+    private val _providerPhases = MutableStateFlow<Map<String, List<PaymentPhase>>>(emptyMap())
+    val providerPhases: StateFlow<Map<String, List<PaymentPhase>>> = _providerPhases.asStateFlow()
+
     private val _providerNames = MutableStateFlow<Map<String, String>>(emptyMap())
     val providerNames: StateFlow<Map<String, String>> = _providerNames.asStateFlow()
 
+    private val _allProjects = MutableStateFlow<List<Project>>(emptyList())
+    val allProjects: StateFlow<List<Project>> = _allProjects.asStateFlow()
+
     init {
-        loadProvidersAndComputeSummaries()
+        loadData()
         observeAllTransactions()
+        observeProjects()
+    }
+
+    private fun observeProjects() {
+        viewModelScope.launch {
+            InternalDb.projects.collect { _allProjects.value = it }
+        }
     }
 
     private fun observeAllTransactions() {
         viewModelScope.launch {
-            ProviderTxDb._transactions.collect { list ->
+            InternalDb.providerTransactions.collect { list ->
                 _allTransactions.value = list.sortedByDescending { it.timestamp }
             }
         }
     }
 
-    private fun loadProvidersAndComputeSummaries() {
+    private fun loadData() {
         viewModelScope.launch {
             _loading.value = true
             try {
-                employeeRepository.getEmployees().collect { allEmployees ->
+                combine(
+                    employeeRepository.getEmployees(),
+                    InternalDb.providerTransactions,
+                    InternalDb.paymentPhases
+                ) { employees, transactions, phases ->
+                    Triple(employees, transactions, phases)
+                }.collect { (allEmployees, allTransactions, allPhases) ->
                     val providers = allEmployees.filter { it.puesto.equals("Proveedor", ignoreCase = true) }
-
-                    // Build name map for history lookups
                     _providerNames.value = providers.associate { it.uid to it.nombreCompleto }
+                    
+                    val phaseMap = allPhases.groupBy { it.providerId }
+                    _providerPhases.value = phaseMap
 
-                    calculateSummaries(providers)
+                    val summaries = providers.map { provider ->
+                        val providerTxs = allTransactions.filter { it.providerId == provider.uid }
+                        val providerPhases = phaseMap[provider.uid] ?: emptyList()
+
+                        val totalEarned = providerTxs.filter { it.type == TransactionType.SERVICE }.sumOf { it.providerCut }
+                        val totalPaid   = providerTxs.filter { it.type == TransactionType.PAYMENT }.sumOf { it.rawAmount }
+                        val totalProfit = providerTxs.filter { it.type == TransactionType.SERVICE }.sumOf { it.companyCut }
+                        val pending     = totalEarned - totalPaid
+
+                        val status = when {
+                            pending <= 0.01 && (providerPhases.isEmpty() || providerPhases.all { it.status == PaymentPhaseStatus.PAGADO }) -> AccountStatus.LIBERADO
+                            totalPaid > 0 || providerPhases.any { it.status == PaymentPhaseStatus.PAGADO } -> AccountStatus.EN_PROCESO
+                            else -> AccountStatus.PENDIENTE
+                        }
+
+                        ProviderAccountSummary(
+                            providerId           = provider.uid,
+                            providerName         = provider.nombreCompleto,
+                            totalServiceAmountEarned = totalEarned,
+                            totalAmountPaid      = totalPaid,
+                            pendingBalance       = pending,
+                            totalCompanyProfit   = totalProfit,
+                            accountStatus        = status
+                        )
+                    }
+                    _providerSummaries.value = summaries.sortedBy { it.providerName }
+                    _loading.value = false
                 }
             } catch (e: Exception) {
                 _error.value = e.message
-            } finally {
                 _loading.value = false
             }
         }
     }
 
-    private suspend fun calculateSummaries(providers: List<Employee>) {
-        for (provider in providers) {
-            transactionRepository.getTransactionsForProvider(provider.uid).collect { transactions ->
-                val totalEarned = transactions.filter { it.type == TransactionType.SERVICE }.sumOf { it.providerCut }
-                val totalPaid   = transactions.filter { it.type == TransactionType.PAYMENT }.sumOf { it.rawAmount }
-                val totalProfit = transactions.filter { it.type == TransactionType.SERVICE }.sumOf { it.companyCut }
-                val pending     = totalEarned - totalPaid
-
-                val summary = ProviderAccountSummary(
-                    providerId           = provider.uid,
-                    providerName         = provider.nombreCompleto,
-                    totalServiceAmountEarned = totalEarned,
-                    totalAmountPaid      = totalPaid,
-                    pendingBalance       = pending,
-                    totalCompanyProfit   = totalProfit
-                )
-
-                val currentList = _providerSummaries.value.toMutableList()
-                val index = currentList.indexOfFirst { it.providerId == provider.uid }
-                if (index != -1) currentList[index] = summary else currentList.add(summary)
-                currentList.sortBy { it.providerName }
-                _providerSummaries.value = currentList
-            }
-        }
-    }
-
-    fun registerService(providerId: String, clientPayment: Double, description: String) {
+    fun registerService(providerId: String, clientPayment: Double, description: String, projectId: String? = null) {
         viewModelScope.launch {
-            try { transactionRepository.addServiceTransaction(providerId, clientPayment, description) }
+            try { transactionRepository.addServiceTransaction(providerId, clientPayment, description, projectId) }
             catch (e: Exception) { _error.value = "Error al registrar servicio: ${e.message}" }
         }
     }
 
-    fun registerPayment(providerId: String, amountPaid: Double, description: String) {
+    fun registerPayment(providerId: String, amountPaid: Double, description: String, projectId: String? = null, phaseId: String? = null) {
         viewModelScope.launch {
-            try { transactionRepository.addPaymentTransaction(providerId, amountPaid, description) }
+            try { transactionRepository.addPaymentTransaction(providerId, amountPaid, description, projectId, phaseId) }
             catch (e: Exception) { _error.value = "Error al registrar abono: ${e.message}" }
+        }
+    }
+
+    fun addPaymentPhase(phase: PaymentPhase) {
+        viewModelScope.launch {
+            try { transactionRepository.createPaymentPhase(phase) }
+            catch (e: Exception) { _error.value = "Error al crear fase: ${e.message}" }
+        }
+    }
+
+    fun removePaymentPhase(phaseId: String) {
+        viewModelScope.launch {
+            try { transactionRepository.deletePaymentPhase(phaseId) }
+            catch (e: Exception) { _error.value = "Error al eliminar fase: ${e.message}" }
         }
     }
 

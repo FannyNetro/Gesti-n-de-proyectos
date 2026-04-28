@@ -1,8 +1,10 @@
 package com.vgtech.mobile.ui.screens.rh
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,35 +27,36 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.vgtech.mobile.data.model.ProviderAccountSummary
-import com.vgtech.mobile.data.model.ProviderTransaction
-import com.vgtech.mobile.data.model.TransactionType
+import com.vgtech.mobile.data.model.*
 import com.vgtech.mobile.ui.theme.*
 import com.vgtech.mobile.ui.viewmodel.ProviderPayableViewModel
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ROOT SCREEN
-// ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProviderPayableScreen(
-    viewModel: ProviderPayableViewModel = viewModel()
+    viewModel: ProviderPayableViewModel = viewModel(),
+    canManagePhases: Boolean = true,
+    canRegisterPayments: Boolean = true
 ) {
     val loading by viewModel.loading.collectAsState()
     val summaries by viewModel.providerSummaries.collectAsState()
     val allTransactions by viewModel.allTransactions.collectAsState()
+    val providerPhases by viewModel.providerPhases.collectAsState()
     val providerNames by viewModel.providerNames.collectAsState()
     val error by viewModel.error.collectAsState()
+    val allProjects by viewModel.allProjects.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Por Pagar", "Pagadas", "Historial", "Inmobiliaria")
 
-    var showDialog by remember { mutableStateOf(false) }
+    var showServiceDialog by remember { mutableStateOf(false) }
+    var showPaymentDialog by remember { mutableStateOf(false) }
+    var showPhaseManagement by remember { mutableStateOf(false) }
     var selectedProvider by remember { mutableStateOf<ProviderAccountSummary?>(null) }
-    var isPayment by remember { mutableStateOf(false) }
+    var targetPhase by remember { mutableStateOf<PaymentPhase?>(null) }
 
     if (error != null) {
         AlertDialog(
@@ -64,25 +67,52 @@ fun ProviderPayableScreen(
         )
     }
 
-    if (showDialog && selectedProvider != null) {
+    // Dialog for "Cliente Pagó" (Service Revenue)
+    if (showServiceDialog && selectedProvider != null) {
         TransactionDialog(
             providerName = selectedProvider!!.providerName,
-            isPayment = isPayment,
-            onDismiss = { showDialog = false; selectedProvider = null },
+            isPayment = false,
+            onDismiss = { showServiceDialog = false; selectedProvider = null },
             onConfirm = { amount, desc ->
-                if (isPayment) viewModel.registerPayment(selectedProvider!!.providerId, amount, desc)
-                else viewModel.registerService(selectedProvider!!.providerId, amount, desc)
-                showDialog = false; selectedProvider = null
+                viewModel.registerService(selectedProvider!!.providerId, amount, desc)
+                showServiceDialog = false; selectedProvider = null
             }
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF4F6FB))) {
+    // Dialog for "Abonar" (Provider Payment)
+    if (showPaymentDialog && selectedProvider != null) {
+        val nextPhase = providerPhases[selectedProvider!!.providerId]?.find { it.status == PaymentPhaseStatus.PENDIENTE }
+        PaymentDialog(
+            summary = selectedProvider!!,
+            suggestedPhase = nextPhase,
+            onDismiss = { showPaymentDialog = false; selectedProvider = null },
+            onConfirm = { amount, desc, phaseId ->
+                viewModel.registerPayment(
+                    providerId = selectedProvider!!.providerId,
+                    amountPaid = amount,
+                    description = desc,
+                    phaseId = phaseId
+                )
+                showPaymentDialog = false; selectedProvider = null
+            }
+        )
+    }
 
-        // ── KPI Header Strip ──────────────────────────────────────────────
+    if (showPhaseManagement && selectedProvider != null) {
+        ManagePhasesDialog(
+            provider = selectedProvider!!,
+            phases = providerPhases[selectedProvider!!.providerId] ?: emptyList(),
+            availableProjects = allProjects.filter { it.providerUid == selectedProvider!!.providerId },
+            onDismiss = { showPhaseManagement = false; selectedProvider = null },
+            onAddPhase = { phase -> viewModel.addPaymentPhase(phase) },
+            onDeletePhase = { phaseId -> viewModel.removePaymentPhase(phaseId) }
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF4F6FB))) {
         KpiHeaderStrip(summaries = summaries)
 
-        // ── Tab Row ───────────────────────────────────────────────────────
         TabRow(
             selectedTabIndex = selectedTab,
             containerColor = Color.White,
@@ -114,37 +144,38 @@ fun ProviderPayableScreen(
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Teal)
         }
 
-        // ── Tab Content ───────────────────────────────────────────────────
         when (selectedTab) {
             0 -> PendingTab(
-                summaries = summaries.filter { it.pendingBalance > 0 },
-                onAddService = { summary ->
-                    selectedProvider = summary; isPayment = false; showDialog = true
-                },
-                onAddPayment = { summary ->
-                    selectedProvider = summary; isPayment = true; showDialog = true
+                summaries = summaries.filter { it.accountStatus != AccountStatus.LIBERADO },
+                phases = providerPhases,
+                canManagePhases = canManagePhases,
+                canRegisterPayments = canRegisterPayments,
+                onAddService = { summary -> selectedProvider = summary; showServiceDialog = true },
+                onAddPayment = { summary -> selectedProvider = summary; showPaymentDialog = true },
+                onManagePhases = { summary -> selectedProvider = summary; showPhaseManagement = true },
+                onPayPhase = { summary, phase ->
+                    viewModel.registerPayment(
+                        providerId = summary.providerId,
+                        amountPaid = phase.amountToPay,
+                        description = "Pago de Fase ${phase.phaseNumber}/${phase.totalPhases}",
+                        projectId = phase.projectId,
+                        phaseId = phase.id
+                    )
                 }
             )
-            1 -> PaidTab(summaries = summaries.filter { it.pendingBalance <= 0 })
-            2 -> HistoryTab(
-                transactions = allTransactions,
-                providerNames = providerNames
-            )
+            1 -> PaidTab(summaries = summaries.filter { it.accountStatus == AccountStatus.LIBERADO })
+            2 -> HistoryTab(transactions = allTransactions, providerNames = providerNames)
             3 -> InmobiliariaTab(summaries = summaries)
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// KPI HEADER STRIP
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun KpiHeaderStrip(summaries: List<ProviderAccountSummary>) {
     val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
     val totalDebt    = summaries.sumOf { it.pendingBalance }
     val totalPaid    = summaries.sumOf { it.totalAmountPaid }
     val totalProfit  = summaries.sumOf { it.totalCompanyProfit }
-    val countPending = summaries.count { it.pendingBalance > 0 }
 
     Box(
         modifier = Modifier
@@ -185,14 +216,16 @@ private fun KpiDivider() {
     Box(modifier = Modifier.width(1.dp).height(36.dp).background(Color.White.copy(alpha = 0.15f)))
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TAB: POR PAGAR
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun PendingTab(
     summaries: List<ProviderAccountSummary>,
+    phases: Map<String, List<PaymentPhase>>,
+    canManagePhases: Boolean,
+    canRegisterPayments: Boolean,
     onAddService: (ProviderAccountSummary) -> Unit,
-    onAddPayment: (ProviderAccountSummary) -> Unit
+    onAddPayment: (ProviderAccountSummary) -> Unit,
+    onManagePhases: (ProviderAccountSummary) -> Unit,
+    onPayPhase: (ProviderAccountSummary, PaymentPhase) -> Unit
 ) {
     if (summaries.isEmpty()) {
         EmptyState(icon = Icons.Default.CheckCircle, message = "¡Sin deudas pendientes! 🎉")
@@ -206,17 +239,18 @@ private fun PendingTab(
         items(summaries, key = { it.providerId }) { summary ->
             ProviderAccountCard(
                 summary = summary,
-                isPending = true,
+                phases = phases[summary.providerId] ?: emptyList(),
+                canManagePhases = canManagePhases,
+                canRegisterPayments = canRegisterPayments,
                 onAddService = { onAddService(summary) },
-                onAddPayment = { onAddPayment(summary) }
+                onAddPayment = { onAddPayment(summary) },
+                onManagePhases = { onManagePhases(summary) },
+                onPayPhase = { onPayPhase(summary, it) }
             )
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TAB: PAGADAS
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun PaidTab(summaries: List<ProviderAccountSummary>) {
     if (summaries.isEmpty()) {
@@ -231,17 +265,18 @@ private fun PaidTab(summaries: List<ProviderAccountSummary>) {
         items(summaries, key = { it.providerId }) { summary ->
             ProviderAccountCard(
                 summary = summary,
-                isPending = false,
+                phases = emptyList(),
+                canManagePhases = false,
+                canRegisterPayments = false,
                 onAddService = {},
-                onAddPayment = {}
+                onAddPayment = {},
+                onManagePhases = {},
+                onPayPhase = { _ -> }
             )
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TAB: HISTORIAL
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun HistoryTab(
     transactions: List<ProviderTransaction>,
@@ -280,12 +315,8 @@ private fun HistoryRow(tx: ProviderTransaction, providerName: String) {
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon Badge
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(bgColor),
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(bgColor),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -295,122 +326,76 @@ private fun HistoryRow(tx: ProviderTransaction, providerName: String) {
                     modifier = Modifier.size(20.dp)
                 )
             }
-
             Spacer(modifier = Modifier.width(12.dp))
-
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = providerName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Navy
-                )
+                Text(text = providerName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Navy)
                 Text(
                     text = tx.description.ifBlank { if (isService) "Servicio registrado" else "Abono registrado" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    style = MaterialTheme.typography.bodySmall, color = TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = dateFmt.format(Date(tx.timestamp)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted.copy(alpha = 0.7f)
-                )
+                Text(text = dateFmt.format(Date(tx.timestamp)), style = MaterialTheme.typography.labelSmall, color = TextMuted.copy(alpha = 0.7f))
             }
-
             Spacer(modifier = Modifier.width(8.dp))
-
             Column(horizontalAlignment = Alignment.End) {
                 val label = if (isService) "Cliente pagó" else "Abono"
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = accentColor
-                )
-                Text(
-                    text = fmt.format(tx.rawAmount),
-                    fontWeight = FontWeight.ExtraBold,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = accentColor
-                )
+                Text(text = label, style = MaterialTheme.typography.labelSmall, color = accentColor)
+                Text(text = fmt.format(tx.rawAmount), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.bodyMedium, color = accentColor)
                 if (isService) {
-                    Text(
-                        text = "Prov: ${fmt.format(tx.providerCut)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextMuted
-                    )
+                    Text(text = "Prov: ${fmt.format(tx.providerCut)}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
                 }
             }
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PROVIDER ACCOUNT CARD
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun ProviderAccountCard(
     summary: ProviderAccountSummary,
-    isPending: Boolean,
+    phases: List<PaymentPhase>,
+    canManagePhases: Boolean,
+    canRegisterPayments: Boolean,
     onAddService: () -> Unit,
-    onAddPayment: () -> Unit
+    onAddPayment: () -> Unit,
+    onManagePhases: () -> Unit,
+    onPayPhase: (PaymentPhase) -> Unit
 ) {
     val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+    var expanded by remember { mutableStateOf(false) }
     val balanceColor by animateColorAsState(
-        targetValue = if (summary.pendingBalance > 0) Color(0xFFE53935) else Teal,
+        targetValue = when(summary.accountStatus) {
+            AccountStatus.LIBERADO -> Teal
+            AccountStatus.EN_PROCESO -> WarningAmber
+            else -> Color(0xFFE53935)
+        },
         animationSpec = tween(400), label = "balance_color"
     )
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-
-            // Provider name + status badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier.size(36.dp).clip(CircleShape)
-                            .background(Navy.copy(alpha = 0.1f)),
-                        contentAlignment = Alignment.Center
-                    ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Navy.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.Business, contentDescription = null, tint = Navy, modifier = Modifier.size(18.dp))
                     }
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = summary.providerName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Navy
-                    )
+                    Text(text = summary.providerName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Navy, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (isPending) Color(0xFFFFEBEE) else Color(0xFFE8F5E9)
-                ) {
-                    Text(
-                        text = if (isPending) "Con Deuda" else "Al Corriente",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isPending) Color(0xFFE53935) else Color(0xFF2E7D32)
-                    )
-                }
+                StatusBadge(status = summary.accountStatus)
             }
 
             Spacer(modifier = Modifier.height(14.dp))
             HorizontalDivider(color = Color(0xFFF0F0F0))
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Financial info row
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 FinancialColumn(label = "Total Generado", amount = fmt.format(summary.totalServiceAmountEarned), color = Color(0xFF5C6BC0))
                 FinancialColumn(label = "Total Pagado", amount = fmt.format(summary.totalAmountPaid), color = Teal)
@@ -419,45 +404,65 @@ private fun ProviderAccountCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Saldo pendiente highlight
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(balanceColor.copy(alpha = 0.08f))
-                    .padding(12.dp)
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(balanceColor.copy(alpha = 0.08f)).padding(12.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = if (summary.pendingBalance > 0) Icons.Default.Warning else Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = balanceColor,
-                            modifier = Modifier.size(18.dp)
+                            contentDescription = null, tint = balanceColor, modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Saldo Pendiente", fontWeight = FontWeight.SemiBold, color = balanceColor)
                     }
-                    Text(
-                        text = fmt.format(summary.pendingBalance),
-                        fontWeight = FontWeight.ExtraBold,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = balanceColor
-                    )
+                    Text(text = fmt.format(summary.pendingBalance), fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium, color = balanceColor)
                 }
             }
 
-            // Action buttons (only when pending)
-            if (isPending) {
+            if (phases.isNotEmpty() || canManagePhases) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.clickable { expanded = !expanded }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            if (expanded) "Ocultar Fases" else "Ver Fases de Pago (${phases.size})",
+                            style = MaterialTheme.typography.labelMedium, color = Navy, fontWeight = FontWeight.Bold
+                        )
+                        Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = Navy, modifier = Modifier.size(20.dp))
+                    }
+                    
+                    if (canManagePhases) {
+                        TextButton(onClick = onManagePhases, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                            Icon(Icons.Default.Settings, null, modifier = Modifier.size(14.dp), tint = Navy)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Gestionar Fases", style = MaterialTheme.typography.labelSmall, color = Navy)
+                        }
+                    }
+                }
+
+                if (expanded) {
+                    if (phases.isEmpty()) {
+                        Text("No hay fases configuradas", style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(vertical = 8.dp))
+                    } else {
+                        phases.forEach { phase ->
+                            PhaseItem(phase = phase, canPay = canRegisterPayments, onPay = { onPayPhase(phase) })
+                        }
+                    }
+                }
+            }
+
+            if (summary.accountStatus != AccountStatus.LIBERADO && canRegisterPayments) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
-                        onClick = onAddService,
-                        modifier = Modifier.weight(1f),
+                        onClick = onAddService, modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF5C6BC0)),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF5C6BC0))
                     ) {
@@ -466,8 +471,7 @@ private fun ProviderAccountCard(
                         Text("Cliente Pagó", style = MaterialTheme.typography.labelSmall)
                     }
                     Button(
-                        onClick = onAddPayment,
-                        modifier = Modifier.weight(1f),
+                        onClick = onAddPayment, modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = Teal)
                     ) {
                         Icon(Icons.Default.AttachMoney, null, modifier = Modifier.size(15.dp))
@@ -481,6 +485,44 @@ private fun ProviderAccountCard(
 }
 
 @Composable
+private fun StatusBadge(status: AccountStatus) {
+    val (text, color, bg) = when(status) {
+        AccountStatus.PENDIENTE -> Triple("Pendiente", Color(0xFFE53935), Color(0xFFFFEBEE))
+        AccountStatus.EN_PROCESO -> Triple("En Proceso", WarningAmber, WarningAmber.copy(alpha = 0.1f))
+        AccountStatus.LIBERADO -> Triple("Liberado", Color(0xFF2E7D32), Color(0xFFE8F5E9))
+    }
+    Surface(shape = RoundedCornerShape(20.dp), color = bg) {
+        Text(text = text, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+@Composable
+private fun PhaseItem(phase: PaymentPhase, canPay: Boolean, onPay: () -> Unit) {
+    val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+    val dateFmt = SimpleDateFormat("dd/MM/yyyy", Locale("es", "MX"))
+    val isPaid = phase.status == PaymentPhaseStatus.PAGADO
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(8.dp)).background(SurfaceGray.copy(alpha = 0.5f)).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Fase ${phase.phaseNumber} de ${phase.totalPhases}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Navy)
+            Text("Vence: ${dateFmt.format(Date(phase.scheduledDate))}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+        }
+        Text(fmt.format(phase.amountToPay), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.ExtraBold, color = if (isPaid) Teal else Navy, modifier = Modifier.padding(horizontal = 8.dp))
+        
+        if (isPaid) {
+            Icon(Icons.Default.CheckCircle, null, tint = Teal, modifier = Modifier.size(20.dp))
+        } else if (canPay) {
+            IconButton(onClick = onPay, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Default.Payments, null, tint = Navy)
+            }
+        }
+    }
+}
+
+@Composable
 private fun FinancialColumn(label: String, amount: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text = label, style = MaterialTheme.typography.labelSmall, color = TextMuted, fontSize = 10.sp)
@@ -488,127 +530,59 @@ private fun FinancialColumn(label: String, amount: String, color: Color) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TAB: INMOBILIARIA — Ganancias de la Empresa
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun InmobiliariaTab(summaries: List<ProviderAccountSummary>) {
     val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
-
-    // Totales globales
     val totalClientRevenue  = summaries.sumOf { it.totalServiceAmountEarned + it.totalCompanyProfit }
-    val totalProviderPaid   = summaries.sumOf { it.totalServiceAmountEarned }   // 50% proveedor
-    val totalCompanyEarned  = summaries.sumOf { it.totalCompanyProfit }          // 50% empresa
-    val totalPendingProv    = summaries.sumOf { it.pendingBalance }              // aún por pagar a proveedores
-    val netAfterPending     = totalCompanyEarned                                 // la ganancia de empresa no cambia con lo pendiente
+    val totalProviderPaid   = summaries.sumOf { it.totalServiceAmountEarned }
+    val totalCompanyEarned  = summaries.sumOf { it.totalCompanyProfit }
+    val totalPendingProv    = summaries.sumOf { it.pendingBalance }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF4F6FB)),
+        modifier = Modifier.fillMaxSize().background(Color(0xFFF4F6FB)),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-
-        // ── Tarjeta Resumen Global ─────────────────────────────────────────
         item {
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1B2A)),
-                elevation = CardDefaults.cardElevation(6.dp)
+                modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1B2A)), elevation = CardDefaults.cardElevation(6.dp)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF00D4AA).copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.AccountBalance,
-                                contentDescription = null,
-                                tint = Color(0xFF00D4AA),
-                                modifier = Modifier.size(22.dp)
-                            )
+                        Box(modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF00D4AA).copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.AccountBalance, null, tint = Color(0xFF00D4AA), modifier = Modifier.size(22.dp))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text(
-                                "VG Tech · Ganancias Totales",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
-                            )
-                            Text(
-                                "50% de cada pago del cliente",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.5f)
-                            )
+                            Text("VG Tech · Ganancias Totales", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                            Text("50% de cada pago del cliente", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
                         }
                     }
-
                     Spacer(modifier = Modifier.height(20.dp))
-
-                    // Ingreso total de clientes
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Ingresos Totales de Clientes", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
                         Text(fmt.format(totalClientRevenue), fontWeight = FontWeight.Bold, color = Color.White)
                     }
-
                     Spacer(modifier = Modifier.height(6.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Parte de Proveedores (50%)", style = MaterialTheme.typography.bodySmall, color = Color(0xFFFF7676).copy(alpha = 0.85f))
                         Text(fmt.format(totalProviderPaid), fontWeight = FontWeight.Bold, color = Color(0xFFFF7676))
                     }
-
                     Spacer(modifier = Modifier.height(6.dp))
-
                     HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
-
                     Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Ganancia Neta Inmobiliaria", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = Color(0xFF00D4AA))
-                        Text(
-                            fmt.format(netAfterPending),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color(0xFF00D4AA)
-                        )
+                        Text(fmt.format(totalCompanyEarned), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Color(0xFF00D4AA))
                     }
-
                     if (totalPendingProv > 0) {
                         Spacer(modifier = Modifier.height(10.dp))
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFFF7676).copy(alpha = 0.10f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                        Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFFF7676).copy(alpha = 0.10f), modifier = Modifier.fillMaxWidth()) {
+                            Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Warning, null, tint = Color(0xFFFF7676), modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    "Deuda pendiente con proveedores: ${fmt.format(totalPendingProv)}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFFF7676)
-                                )
+                                Text("Deuda pendiente con proveedores: ${fmt.format(totalPendingProv)}", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFF7676))
                             }
                         }
                     }
@@ -616,51 +590,8 @@ private fun InmobiliariaTab(summaries: List<ProviderAccountSummary>) {
             }
         }
 
-        // ── Mini barras de relación cliente → empresa ──────────────────────
-        item {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = Color(0xFF5C6BC0).copy(alpha = 0.08f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Info, null, tint = Color(0xFF5C6BC0), modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "Por cada peso que paga el cliente, el 50% es ganancia de la inmobiliaria y el 50% se destina al proveedor ejecutor.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF5C6BC0)
-                    )
-                }
-            }
-        }
-
-        // ── Desglose por Proveedor ─────────────────────────────────────────
-        item {
-            Text(
-                "Desglose por Proveedor",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = Navy
-            )
-        }
-
-        if (summaries.isEmpty()) {
-            item {
-                EmptyState(icon = Icons.Default.BarChart, message = "Sin transacciones registradas aún")
-            }
-        } else {
-            items(summaries.filter { it.totalCompanyProfit > 0 || it.totalServiceAmountEarned > 0 }, key = { it.providerId }) { summary ->
-                InmobiliariaProviderCard(summary = summary, fmt = fmt)
-            }
-            if (summaries.all { it.totalCompanyProfit == 0.0 && it.totalServiceAmountEarned == 0.0 }) {
-                item {
-                    EmptyState(icon = Icons.Default.BarChart, message = "Sin ingresos registrados aún")
-                }
-            }
+        items(summaries.filter { it.totalCompanyProfit > 0 || it.totalServiceAmountEarned > 0 }, key = { it.providerId }) { summary ->
+            InmobiliariaProviderCard(summary = summary, fmt = fmt)
         }
     }
 }
@@ -668,199 +599,290 @@ private fun InmobiliariaTab(summaries: List<ProviderAccountSummary>) {
 @Composable
 private fun InmobiliariaProviderCard(summary: ProviderAccountSummary, fmt: NumberFormat) {
     val totalClientForProvider = summary.totalServiceAmountEarned + summary.totalCompanyProfit
-    val pctEmpresa = if (totalClientForProvider > 0)
-        (summary.totalCompanyProfit / totalClientForProvider).toFloat().coerceIn(0f, 1f)
-    else 0f
+    val pctEmpresa = if (totalClientForProvider > 0) (summary.totalCompanyProfit / totalClientForProvider).toFloat().coerceIn(0f, 1f) else 0f
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp)
+        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF43A047).copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFF43A047).copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.Store, null, tint = Color(0xFF43A047), modifier = Modifier.size(18.dp))
                     }
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        summary.providerName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Navy
-                    )
+                    Text(summary.providerName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.ExtraBold, color = Navy)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Ganancia", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-                    Text(
-                        fmt.format(summary.totalCompanyProfit),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF43A047)
-                    )
+                    Text(fmt.format(summary.totalCompanyProfit), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.ExtraBold, color = Color(0xFF43A047))
                 }
             }
-
             Spacer(modifier = Modifier.height(12.dp))
-
-            // Barra de distribución cliente ↔ empresa / proveedor
-            Text("Distribución del ingreso del cliente", style = MaterialTheme.typography.labelSmall, color = TextMuted)
-            Spacer(modifier = Modifier.height(4.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(Color(0xFFFF7676).copy(alpha = 0.25f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(pctEmpresa)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(5.dp))
-                        .background(Color(0xFF43A047))
-                )
+            Box(modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xFFFF7676).copy(alpha = 0.25f))) {
+                Box(modifier = Modifier.fillMaxWidth(pctEmpresa).fillMaxHeight().clip(RoundedCornerShape(5.dp)).background(Color(0xFF43A047)))
             }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF43A047)))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Empresa ${(pctEmpresa * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = Color(0xFF43A047), fontWeight = FontWeight.Bold)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFF7676)))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Proveedor ${(100 - (pctEmpresa * 100).toInt())}%", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFF7676), fontWeight = FontWeight.Bold)
-                }
-            }
-
             Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = Color(0xFFF0F0F0))
-            Spacer(modifier = Modifier.height(10.dp))
-
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                FinancialColumn(label = "Total Cliente Pagó", amount = fmt.format(totalClientForProvider), color = Color(0xFF5C6BC0))
-                FinancialColumn(label = "Parte Proveedor", amount = fmt.format(summary.totalServiceAmountEarned), color = Color(0xFFE53935))
-                FinancialColumn(label = "Ganancia Inmob.", amount = fmt.format(summary.totalCompanyProfit), color = Color(0xFF43A047))
-            }
-
-            if (summary.pendingBalance > 0) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFFF7676).copy(alpha = 0.07f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.PendingActions, null, tint = Color(0xFFE53935), modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            "Pendiente por pagar al proveedor: ${fmt.format(summary.pendingBalance)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFE53935)
-                        )
-                    }
-                }
+                FinancialColumn(label = "Total Cliente", amount = fmt.format(totalClientForProvider), color = Color(0xFF5C6BC0))
+                FinancialColumn(label = "Parte Prov", amount = fmt.format(summary.totalServiceAmountEarned), color = Color(0xFFE53935))
+                FinancialColumn(label = "Ganancia", amount = fmt.format(summary.totalCompanyProfit), color = Color(0xFF43A047))
             }
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// EMPTY STATE
-// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun EmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, message: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(64.dp), tint = TextMuted.copy(alpha = 0.4f))
+            Icon(icon, null, modifier = Modifier.size(64.dp), tint = TextMuted.copy(alpha = 0.4f))
             Spacer(modifier = Modifier.height(12.dp))
             Text(message, color = TextMuted, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TRANSACTION DIALOG
-// ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TransactionDialog(
-    providerName: String,
-    isPayment: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: (Double, String) -> Unit
-) {
+fun TransactionDialog(providerName: String, isPayment: Boolean, onDismiss: () -> Unit, onConfirm: (Double, String) -> Unit) {
     var amountStr by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
-    val title = if (isPayment) "Abonar a $providerName" else "Ingreso de Cliente · $providerName"
+    
+    val parsedAmount = amountStr.replace(",", ".").toDoubleOrNull()
+    val isValid = parsedAmount != null && parsedAmount > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) },
+        title = { Text(if (isPayment) "Abonar a $providerName" else "Ingreso de Cliente · $providerName", fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                if (!isPayment) {
-                    Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFF5C6BC0).copy(alpha = 0.08f)) {
-                        Text(
-                            "El monto ingresado se dividirá automáticamente 50% empresa / 50% proveedor.",
-                            modifier = Modifier.padding(10.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF5C6BC0)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
                 OutlinedTextField(
-                    value = amountStr,
-                    onValueChange = { amountStr = it },
-                    label = { Text("Monto ($)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
+                    value = amountStr, 
+                    onValueChange = { amountStr = it }, 
+                    label = { Text("Monto ($)") }, 
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), 
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Teal, focusedLabelColor = Teal)
+                    isError = amountStr.isNotEmpty() && !isValid
                 )
+                if (amountStr.isNotEmpty() && !isValid) {
+                    Text("Ingresa un monto válido", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                }
                 Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Descripción") }, modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = { 
+            Button(
+                onClick = { parsedAmount?.let { onConfirm(it, desc) } }, 
+                colors = ButtonDefaults.buttonColors(containerColor = Teal),
+                enabled = isValid
+            ) { 
+                Text("Guardar") 
+            } 
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PaymentDialog(
+    summary: ProviderAccountSummary,
+    suggestedPhase: PaymentPhase?,
+    onDismiss: () -> Unit,
+    onConfirm: (Double, String, String?) -> Unit
+) {
+    val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+    var amountStr by remember { mutableStateOf(suggestedPhase?.amountToPay?.toString() ?: "") }
+    var desc by remember { mutableStateOf(suggestedPhase?.let { "Pago de Fase ${it.phaseNumber}/${it.totalPhases}" } ?: "") }
+    
+    val parsedAmount = amountStr.replace(",", ".").toDoubleOrNull()
+    val isValid = parsedAmount != null && parsedAmount > 0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Abonar a ${summary.providerName}", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    color = WarningAmber.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text("Saldo pendiente total:", style = MaterialTheme.typography.labelSmall, color = Navy)
+                        Text(fmt.format(summary.pendingBalance), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold, color = Color(0xFFE53935))
+                    }
+                }
+
+                if (suggestedPhase != null) {
+                    Text(
+                        "Fase pendiente detectada: Fase ${suggestedPhase.phaseNumber}/${suggestedPhase.totalPhases}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Teal
+                    )
+                }
+
                 OutlinedTextField(
-                    value = desc,
-                    onValueChange = { desc = it },
-                    label = { Text(if (isPayment) "Concepto del abono" else "Descripción del servicio") },
-                    singleLine = true,
+                    value = amountStr, 
+                    onValueChange = { amountStr = it }, 
+                    label = { Text("Monto a Abonar ($)") }, 
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), 
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Teal, focusedLabelColor = Teal)
+                    isError = amountStr.isNotEmpty() && !isValid
+                )
+                
+                OutlinedTextField(
+                    value = desc, 
+                    onValueChange = { desc = it }, 
+                    label = { Text("Descripción") }, 
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Text(
+                    "Lo que queda de restante para el proveedor: ${fmt.format(summary.pendingBalance - (parsedAmount ?: 0.0))}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted
                 )
             }
         },
-        confirmButton = {
+        confirmButton = { 
+            Button(
+                onClick = { parsedAmount?.let { onConfirm(it, desc, suggestedPhase?.id) } }, 
+                colors = ButtonDefaults.buttonColors(containerColor = Teal),
+                enabled = isValid
+            ) { 
+                Text("Confirmar Abono")
+            } 
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ManagePhasesDialog(
+    provider: ProviderAccountSummary,
+    phases: List<PaymentPhase>,
+    availableProjects: List<Project>,
+    onDismiss: () -> Unit,
+    onAddPhase: (PaymentPhase) -> Unit,
+    onDeletePhase: (String) -> Unit
+) {
+    var showAddForm by remember { mutableStateOf(false) }
+    val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Fases de Pago: ${provider.providerName}", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                if (showAddForm) {
+                    AddPhaseForm(
+                        providerId = provider.providerId,
+                        projects = availableProjects,
+                        onCancel = { showAddForm = false },
+                        onSave = { onAddPhase(it); showAddForm = false }
+                    )
+                } else {
+                    Button(
+                        onClick = { showAddForm = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Navy)
+                    ) {
+                        Icon(Icons.Default.Add, null)
+                        Text("Nueva Fase")
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(phases) { phase ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color.Gray.copy(alpha = 0.1f)).padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Fase ${phase.phaseNumber}/${phase.totalPhases}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                                    Text(fmt.format(phase.amountToPay), color = Navy, style = MaterialTheme.typography.labelSmall)
+                                }
+                                IconButton(onClick = { onDeletePhase(phase.id) }) {
+                                    Icon(Icons.Default.Delete, null, tint = Color.Red, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddPhaseForm(
+    providerId: String,
+    projects: List<Project>,
+    onCancel: () -> Unit,
+    onSave: (PaymentPhase) -> Unit
+) {
+    var amount by remember { mutableStateOf("") }
+    var phaseNum by remember { mutableStateOf("") }
+    var totalPhases by remember { mutableStateOf("") }
+    var selectedProject by remember { mutableStateOf(projects.firstOrNull()) }
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Nueva Fase de Pago", fontWeight = FontWeight.Bold, color = Teal)
+        
+        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
+            OutlinedTextField(
+                value = selectedProject?.title ?: "Sin proyectos",
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Proyecto") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth()
+            )
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                projects.forEach { project ->
+                    DropdownMenuItem(
+                        text = { Text(project.title) },
+                        onClick = { selectedProject = project; expanded = false }
+                    )
+                }
+            }
+        }
+
+        OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Monto ($)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(value = phaseNum, onValueChange = { phaseNum = it }, label = { Text("Fase #") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+            OutlinedTextField(value = totalPhases, onValueChange = { totalPhases = it }, label = { Text("Total Fases") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onCancel) { Text("Cancelar") }
             Button(
                 onClick = {
-                    val amt = amountStr.toDoubleOrNull()
-                    if (amt != null && amt > 0) onConfirm(amt, desc)
+                    val a = amount.replace(",",".").toDoubleOrNull() ?: 0.0
+                    val p = phaseNum.toIntOrNull() ?: 1
+                    val t = totalPhases.toIntOrNull() ?: 1
+                    if (a > 0 && selectedProject != null) {
+                        onSave(PaymentPhase(
+                            providerId = providerId,
+                            projectId = selectedProject!!.id,
+                            phaseNumber = p,
+                            totalPhases = t,
+                            amountToPay = a,
+                            scheduledDate = System.currentTimeMillis() + (7 * 86400000L) // +1 week default
+                        ))
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Teal)
-            ) { Text("Guardar") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar", color = TextMuted) }
+            ) { Text("Agregar") }
         }
-    )
+    }
 }

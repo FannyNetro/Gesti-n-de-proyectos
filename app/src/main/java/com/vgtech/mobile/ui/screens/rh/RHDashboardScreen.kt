@@ -115,7 +115,7 @@ fun RHDashboardScreen(
                     "sueldos" -> SalaryControlScreen()
                     "supervisores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Supervisor"))
                     "proveedores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Proveedor"))
-                    "cuentas_proveedores" -> ProviderPayableScreen()
+                    "cuentas_proveedores" -> ProviderPayableScreen(canManagePhases = false, canRegisterPayments = true)
                     "consultores" -> EmployeeListScreen(employeeViewModel = employeeViewModel, filterRoles = listOf("Consultor"))
                     "registrar" -> EmployeeRegistrationScreen(employeeViewModel = employeeViewModel, onBack = { selectedDrawerRoute = "empleados" })
                     "perfil" -> ProfileTab(onLogout = onLogout)

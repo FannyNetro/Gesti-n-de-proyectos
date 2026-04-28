@@ -7,9 +7,34 @@ enum class TransactionType {
     PAYMENT  // When the company pays the provider (reduces debt)
 }
 
+enum class PaymentPhaseStatus {
+    PENDIENTE,
+    PAGADO
+}
+
+enum class AccountStatus {
+    PENDIENTE,
+    EN_PROCESO,
+    LIBERADO
+}
+
+data class PaymentPhase(
+    val id: String = UUID.randomUUID().toString(),
+    val providerId: String,
+    val projectId: String,
+    val phaseNumber: Int, // e.g. 1
+    val totalPhases: Int, // e.g. 10
+    val amountToPay: Double,
+    val scheduledDate: Long,
+    val status: PaymentPhaseStatus = PaymentPhaseStatus.PENDIENTE,
+    val paidDate: Long? = null
+)
+
 data class ProviderTransaction(
     val id: String = UUID.randomUUID().toString(),
     val providerId: String = "",
+    val projectId: String? = null,
+    val phaseId: String? = null, // Optional link to a specific phase
     val timestamp: Long = System.currentTimeMillis(),
     val type: TransactionType = TransactionType.SERVICE,
     
@@ -34,5 +59,6 @@ data class ProviderAccountSummary(
     // Remaining debt
     val pendingBalance: Double,
     // Company's total profit from this provider's services
-    val totalCompanyProfit: Double
+    val totalCompanyProfit: Double,
+    val accountStatus: AccountStatus = AccountStatus.PENDIENTE
 )

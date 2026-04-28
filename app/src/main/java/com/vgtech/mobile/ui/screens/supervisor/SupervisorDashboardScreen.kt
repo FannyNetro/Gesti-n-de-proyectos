@@ -30,7 +30,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.vgtech.mobile.data.local.InternalDb
 import com.vgtech.mobile.data.model.*
+import com.vgtech.mobile.ui.screens.rh.ProviderPayableScreen
+import com.vgtech.mobile.ui.screens.rh.ManagePhasesDialog
 import com.vgtech.mobile.ui.theme.*
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.launch
@@ -54,6 +57,7 @@ fun SupervisorDashboardScreen(
     val invitations by InternalDb.invitations.collectAsState()
     val quotations by InternalDb.quotations.collectAsState()
     val evaluations by InternalDb.evaluations.collectAsState()
+    val phases by InternalDb.paymentPhases.collectAsState()
 
     val consultants = employees.filter { it.puesto.lowercase() == "consultor" && it.activo }
     val providers   = employees.filter { it.puesto.lowercase() == "proveedor" && it.activo }
@@ -76,6 +80,7 @@ fun SupervisorDashboardScreen(
                 DrawerItem(Icons.Default.Dashboard, "Tablero de Control", selectedTab == "Tablero") { selectedTab = "Tablero"; scope.launch { drawerState.close() } }
                 DrawerItem(Icons.Default.Folder, "Proyectos Activos", selectedTab == "Proyectos") { selectedTab = "Proyectos"; scope.launch { drawerState.close() } }
                 DrawerItem(Icons.Default.RequestQuote, "Enviar Cotizaciones", selectedTab == "Cotizaciones") { selectedTab = "Cotizaciones"; scope.launch { drawerState.close() } }
+                DrawerItem(Icons.Default.Payments, "Pagos a Proveedores", selectedTab == "Pagos") { selectedTab = "Pagos"; scope.launch { drawerState.close() } }
                 DrawerItem(Icons.Default.Timeline, "Avances Semanales", selectedTab == "Avances") { selectedTab = "Avances"; scope.launch { drawerState.close() } }
                 DrawerItem(Icons.Default.Star, "Evaluar y Calificar", selectedTab == "Evaluar") { selectedTab = "Evaluar"; scope.launch { drawerState.close() } }
                 DrawerItem(Icons.Default.Assessment, "Reportes", selectedTab == "Reportes") { selectedTab = "Reportes"; scope.launch { drawerState.close() } }
@@ -105,6 +110,7 @@ fun SupervisorDashboardScreen(
                     "Tablero" -> DashboardTab(projects, consultants, providers)
                     "Proyectos" -> ProjectsTab(projects, consultants, providers, invitations, quotations)
                     "Cotizaciones" -> SupervisorQuotationsTab(projects, providers)
+                    "Pagos" -> SupervisorProjectPaymentsTab(projects, phases)
                     "Avances" -> ProgressTab(projects, progressReports)
                     "Evaluar" -> EvaluationsTab(projects, consultants, providers, evaluations)
                     "Reportes" -> ReportsTab(projects, consultants, providers, progressReports, evaluations)
@@ -364,76 +370,58 @@ private fun ProjectsTab(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(q.providerName, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = Navy)
-                                            Text("$${String.format("%,.0f", q.amount)} · ${q.estimatedDays} días", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                                            Text(q.projectTitle, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Navy)
+                                            Text("${q.providerName} · $${String.format("%,.0f", q.amount)}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
                                         }
-                                        if (!q.sentToClient) {
-                                            TextButton(
-                                                onClick = {
-                                                    InternalDb.markQuotationSentToClient(q.id)
-                                                    snackMessage = "Cotización enviada al cliente"
-                                                }
-                                            ) {
-                                                Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Enviar", fontSize = 11.sp)
-                                            }
-                                        } else {
-                                            Text("✓ Enviada", style = MaterialTheme.typography.labelSmall, color = SuccessGreen)
+                                        val statusColor = when (q.clientStatus) {
+                                            "Aprobada" -> SuccessGreen
+                                            "Rechazada" -> ErrorRed
+                                            else -> WarningAmber
                                         }
+                                        Text(q.clientStatus, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = statusColor)
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
+
                             // Action buttons
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // HU2 / HU8 — Assign / Reassign
                                 OutlinedButton(
-                                    onClick = {
-                                        selectedProject = project
-                                        showAssignDialog = true
-                                    },
+                                    onClick = { selectedProject = project; showAssignDialog = true },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Teal)
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Navy),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Navy)
                                 ) {
                                     Icon(Icons.Default.PersonAdd, null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text(if (project.consultantUid != null) "Reasignar" else "Asignar", fontSize = 11.sp)
+                                    Text("Asignar", fontSize = 11.sp)
                                 }
-                                // HU7 — Invite provider
                                 OutlinedButton(
-                                    onClick = {
-                                        selectedProject = project
-                                        showInviteDialog = true
-                                    },
+                                    onClick = { selectedProject = project; showInviteDialog = true },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(10.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Mustard),
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Mustard)
                                 ) {
-                                    Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Mail, null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Invitar Prov.", fontSize = 11.sp)
+                                    Text("Invitar", fontSize = 11.sp)
                                 }
-                            }
-                            // HU7 — Send quotation to client
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(
-                                onClick = {
-                                    selectedProject = project
-                                    showQuoteDialog = true
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Navy)
-                            ) {
-                                Icon(Icons.Default.RequestQuote, null, modifier = Modifier.size(16.dp), tint = SurfaceWhite)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Crear Cotización y Enviar al Cliente", fontSize = 12.sp, color = SurfaceWhite)
+                                Button(
+                                    onClick = { selectedProject = project; showQuoteDialog = true },
+                                    modifier = Modifier.weight(1.2f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
+                                ) {
+                                    Icon(Icons.Default.RequestQuote, null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Cotizar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
@@ -443,51 +431,41 @@ private fun ProjectsTab(
 
         SnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
         )
     }
 
-    // ── Assign / Reassign Dialog (HU2 + HU8) ────────────────────
     if (showAssignDialog && selectedProject != null) {
         AssignReassignDialog(
             project = selectedProject!!,
             consultants = consultants,
             providers = providers,
             onDismiss = { showAssignDialog = false },
-            onAssign = { projId, consultantUid, providerUid, providerName ->
-                if (consultantUid != null) InternalDb.assignConsultantToProject(projId, consultantUid)
-                if (providerUid != null) InternalDb.assignProviderToProject(projId, providerUid, providerName)
-                snackMessage = "Asignación actualizada"
+            onAssign = { pid, cid, prid, prName ->
+                val p = projects.find { it.id == pid } ?: return@AssignReassignDialog
+                InternalDb.updateProject(p.copy(consultantUid = cid, providerUid = prid, providerName = prName, status = if (prid != null) "En Progreso" else p.status))
+                snackMessage = "✅ Personal asignado correctamente"
                 showAssignDialog = false
             }
         )
     }
 
-    // ── Invite Provider Dialog (HU7) ─────────────────────────────
     if (showInviteDialog && selectedProject != null) {
         InviteProviderDialog(
             project = selectedProject!!,
             providers = providers,
             onDismiss = { showInviteDialog = false },
-            onInvite = { projId, projTitle, provUid, provName, msg ->
-                InternalDb.addInvitation(
-                    ProviderInvitation(
-                        projectId = projId,
-                        projectTitle = projTitle,
-                        providerUid = provUid,
-                        providerName = provName,
-                        supervisorUid = "sup-uid",
-                        message = msg,
-                        status = "Enviada"
-                    )
-                )
-                snackMessage = "Invitación enviada a $provName"
+            onInvite = { pid, title, prid, prName, msg ->
+                val inv = ProviderInvitation(projectId = pid, projectTitle = title, providerUid = prid, providerName = prName, message = msg)
+                InternalDb.addInvitation(inv)
+                snackMessage = "📩 Invitación enviada al proveedor"
                 showInviteDialog = false
             }
         )
     }
 
-    // ── Send Quotation to Client Dialog (HU7) ─────────────────────────────
     if (showQuoteDialog && selectedProject != null) {
         SendQuotationDialog(
             project = selectedProject!!,
@@ -2231,5 +2209,104 @@ fun SupervisorChatDetailScreen(supervisorUid: String, otherUserUid: String, othe
                 }
             }
         }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  TAB — Pagos a Proveedores (Project Centric for Supervisor)
+// ═════════════════════════════════════════════════════════════════
+@Composable
+fun SupervisorProjectPaymentsTab(
+    projects: List<Project>,
+    phases: List<PaymentPhase>
+) {
+    val activeProjects = projects.filter { it.status == "En Progreso" }
+    var selectedProjectForPhases by remember { mutableStateOf<Project?>(null) }
+    val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+
+    if (activeProjects.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("No hay proyectos activos en este momento.", color = TextMuted)
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                SectionHeader("Definir Fases de Pago por Proyecto")
+                Text("Gestiona los montos y etapas de pago para cada obra activa.", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            items(activeProjects) { project ->
+                val projectPhases = phases.filter { it.projectId == project.id }
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+                    elevation = CardDefaults.cardElevation(2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            StatusDot(project.status)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(project.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Navy, modifier = Modifier.weight(1f))
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Proveedor: ${project.providerName}", style = MaterialTheme.typography.labelMedium, color = Teal, fontWeight = FontWeight.Bold)
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = SurfaceGray)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Text("Resumen de Fases:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Navy)
+                        if (projectPhases.isEmpty()) {
+                            Text("1 fase por defecto (sin definir monto)", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                        } else {
+                            projectPhases.sortedBy { it.phaseNumber }.forEach { phase ->
+                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Fase ${phase.phaseNumber}/${phase.totalPhases}", style = MaterialTheme.typography.bodySmall, color = Navy)
+                                    Text(fmt.format(phase.amountToPay), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Teal)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { selectedProjectForPhases = project },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Navy),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Settings, null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Gestionar Fases")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (selectedProjectForPhases != null) {
+        val project = selectedProjectForPhases!!
+        ManagePhasesDialog(
+            provider = ProviderAccountSummary(
+                providerId = project.providerUid ?: "",
+                providerName = project.providerName,
+                totalServiceAmountEarned = 0.0,
+                totalAmountPaid = 0.0,
+                pendingBalance = 0.0,
+                totalCompanyProfit = 0.0
+            ),
+            phases = phases.filter { it.projectId == project.id },
+            availableProjects = listOf(project),
+            onDismiss = { selectedProjectForPhases = null },
+            onAddPhase = { InternalDb.addPaymentPhase(it) },
+            onDeletePhase = { InternalDb.deletePaymentPhase(it) }
+        )
     }
 }
