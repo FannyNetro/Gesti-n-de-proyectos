@@ -107,7 +107,7 @@ fun SupervisorDashboardScreen(
                     .background(BackgroundLight)
             ) {
                 when (selectedTab) {
-                    "Tablero" -> DashboardTab(projects, consultants, providers)
+                    "Tablero" -> DashboardTab(projects, consultants, providers, quotations)
                     "Proyectos" -> ProjectsTab(projects, consultants, providers, invitations, quotations)
                     "Cotizaciones" -> SupervisorQuotationsTab(projects, providers)
                     "Pagos" -> SupervisorProjectPaymentsTab(projects, phases)
@@ -130,7 +130,8 @@ fun SupervisorDashboardScreen(
 private fun DashboardTab(
     projects: List<Project>,
     consultants: List<Employee>,
-    providers: List<Employee>
+    providers: List<Employee>,
+    quotations: List<Quotation>
 ) {
     val activeProjects = projects.filter { it.status == "En Progreso" }
     val completedProjects = projects.filter { it.status == "Finalizado" }
@@ -161,6 +162,84 @@ private fun DashboardTab(
             ) {
                 DashCard(Modifier.weight(1f), Icons.Default.CheckCircle, "Completados", "${completedProjects.size}", SuccessGreen)
                 DashCard(Modifier.weight(1f), Icons.Default.Warning, "Pendientes", "${pendingProjects.size}", WarningAmber)
+            }
+        }
+
+        // ── Proyectos aprobados por cliente (alerta destacada) ──────
+        val pendingClientApprovals = quotations.filter { it.clientStatus == "Aprobada" && !it.supervisorConfirmed }
+        if (pendingClientApprovals.isNotEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SuccessGreen.copy(alpha = 0.08f)),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, SuccessGreen)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Notifications, null, tint = SuccessGreen, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "Proyectos aprobados por cliente",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = SuccessGreen
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Box(
+                                modifier = Modifier.size(24.dp).clip(CircleShape).background(SuccessGreen),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("${pendingClientApprovals.size}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        pendingClientApprovals.forEach { quotation ->
+                            val project = projects.find { it.id == quotation.projectId }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color.White)
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        project?.title ?: quotation.projectTitle,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Navy
+                                    )
+                                    Text(
+                                        "${quotation.providerName} · $${String.format("%,.0f", quotation.amount)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextMuted
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    onClick = {
+                                        InternalDb.supervisorAcceptProject(
+                                            quotationId   = quotation.id,
+                                            projectId     = quotation.projectId,
+                                            supervisorUid = "sup-uid",
+                                            clientUid     = "cliente-uid"
+                                        )
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Aceptar", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 

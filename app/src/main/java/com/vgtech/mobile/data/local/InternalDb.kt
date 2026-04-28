@@ -126,8 +126,42 @@ object InternalDb {
             ProjectProgress(id = "report-3", projectId = "proj-3", projectTitle = "Torre Corporativa Alfa",    providerUid = "prov-2", providerName = "Materiales del Norte", progressPercentage = 30, description = "Excavación y preparación de terreno.", reportType = "Semanal", date = now - 259_200_000)
         )
 
-        _invitations.value = listOf(ProviderInvitation(id = "inv-1", projectId = "proj-4", projectTitle = "Plaza Comercial Sur", providerUid = "prov-3", providerName = "Electro Servicios MX", supervisorUid = "sup-uid", message = "Invitación para cotizar instalaciones eléctricas.", status = "Cotizada"))
-        _quotations.value = listOf(Quotation(id = "quot-1", invitationId = "inv-1", projectId = "proj-4", projectTitle = "Plaza Comercial Sur", providerUid = "prov-3", providerName = "Electro Servicios MX", amount = 450000.0, estimatedDays = 45, description = "Incluye cableado y tableros.", sentToClient = true))
+        _invitations.value = listOf(
+            ProviderInvitation(id = "inv-1", projectId = "proj-4", projectTitle = "Parque Industrial Oriente", providerUid = "prov-3", providerName = "Electro Servicios MX", supervisorUid = "sup-uid", message = "Invitación para cotizar instalaciones eléctricas.", status = "Cotizada"),
+            ProviderInvitation(id = "inv-2", projectId = "proj-6", projectTitle = "Estadio Municipal Reforma", providerUid = "prov-uid", providerName = "Constructora Pérez S.A.", supervisorUid = "sup-uid", message = "Cotización para obra civil integral del estadio.", status = "Cotizada")
+        )
+        _quotations.value = listOf(
+            // ✅ Cotización APROBADA POR CLIENTE — el supervisor aún no ha aceptado
+            // Esta cotización activa la alerta verde en el Tablero y en el Chat
+            Quotation(
+                id             = "quot-demo-1",
+                invitationId   = "inv-2",
+                projectId      = "proj-6",
+                projectTitle   = "Estadio Municipal Reforma",
+                providerUid    = "prov-uid",
+                providerName   = "Constructora Pérez S.A.",
+                amount         = 620000.0,
+                estimatedDays  = 90,
+                description    = "Obra civil integral: excavación, cimentación y estructura. El cliente aprobó el presupuesto.",
+                sentToClient   = true,
+                clientStatus   = "Aprobada",         // <-- Cliente ya aceptó
+                supervisorConfirmed = false           // <-- Supervisor aún NO ha aceptado
+            ),
+            // Cotización original pendiente de respuesta del cliente
+            Quotation(
+                id             = "quot-1",
+                invitationId   = "inv-1",
+                projectId      = "proj-4",
+                projectTitle   = "Parque Industrial Oriente",
+                providerUid    = "prov-3",
+                providerName   = "Electro Servicios MX",
+                amount         = 450000.0,
+                estimatedDays  = 45,
+                description    = "Incluye cableado, tableros e iluminación industrial.",
+                sentToClient   = true,
+                clientStatus   = "Pendiente"
+            )
+        )
     }
 
     // ── Employee Methods ──────────────────────────
@@ -212,7 +246,45 @@ object InternalDb {
 
     fun supervisorAcceptProject(quotationId: String, projectId: String, supervisorUid: String, clientUid: String) {
         val quotation = _quotations.value.find { it.id == quotationId } ?: return
-        updateQuotationClientStatus(quotationId, "Aceptada")
+        // Mark quotation as accepted & supervisor confirmed
+        _quotations.value = _quotations.value.map {
+            if (it.id == quotationId) it.copy(clientStatus = "Aceptada", supervisorConfirmed = true) else it
+        }
+        // Assign provider to project and set it in progress
         assignProviderToProject(projectId, quotation.providerUid, quotation.providerName)
+        // Auto-register SERVICE transaction so it appears in Cuentas por Pagar (50/50 split)
+        val project = _projects.value.find { it.id == projectId }
+        val cut = quotation.amount / 2.0
+        val tx = ProviderTransaction(
+            providerId   = quotation.providerUid,
+            projectId    = projectId,
+            type         = TransactionType.SERVICE,
+            rawAmount    = quotation.amount,
+            companyCut   = cut,
+            providerCut  = cut,
+            description  = "${project?.title ?: quotation.projectTitle} · Proyecto aprobado por cliente"
+        )
+        _providerTransactions.value += tx
+        // Create two pending payment phases (50% now, 50% at delivery)
+        val now = System.currentTimeMillis()
+        val oneDay = 86_400_000L
+        _paymentPhases.value += PaymentPhase(
+            providerId    = quotation.providerUid,
+            projectId     = projectId,
+            phaseNumber   = 1,
+            totalPhases   = 2,
+            amountToPay   = cut,
+            scheduledDate = now + 7 * oneDay,
+            status        = PaymentPhaseStatus.PENDIENTE
+        )
+        _paymentPhases.value += PaymentPhase(
+            providerId    = quotation.providerUid,
+            projectId     = projectId,
+            phaseNumber   = 2,
+            totalPhases   = 2,
+            amountToPay   = cut,
+            scheduledDate = now + quotation.estimatedDays * oneDay,
+            status        = PaymentPhaseStatus.PENDIENTE
+        )
     }
 }
