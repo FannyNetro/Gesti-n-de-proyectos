@@ -360,7 +360,6 @@ private fun ProviderAccountCard(
     onPayPhase: (PaymentPhase) -> Unit
 ) {
     val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
-    var expanded by remember { mutableStateOf(false) }
     val balanceColor by animateColorAsState(
         targetValue = when(summary.accountStatus) {
             AccountStatus.LIBERADO -> Teal
@@ -427,16 +426,7 @@ private fun ProviderAccountCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        modifier = Modifier.clickable { expanded = !expanded }.padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            if (expanded) "Ocultar Fases" else "Ver Fases de Pago (${phases.size})",
-                            style = MaterialTheme.typography.labelMedium, color = Navy, fontWeight = FontWeight.Bold
-                        )
-                        Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = Navy, modifier = Modifier.size(20.dp))
-                    }
+                    Text("Fases de Pago Programadas", style = MaterialTheme.typography.labelMedium, color = Navy, fontWeight = FontWeight.Bold)
                     
                     if (canManagePhases) {
                         TextButton(onClick = onManagePhases, contentPadding = PaddingValues(horizontal = 8.dp)) {
@@ -447,13 +437,11 @@ private fun ProviderAccountCard(
                     }
                 }
 
-                if (expanded) {
-                    if (phases.isEmpty()) {
-                        Text("No hay fases configuradas", style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(vertical = 8.dp))
-                    } else {
-                        phases.forEach { phase ->
-                            PhaseItem(phase = phase, canPay = canRegisterPayments, onPay = { onPayPhase(phase) })
-                        }
+                if (phases.isEmpty()) {
+                    Text("No hay fases configuradas", style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(vertical = 8.dp))
+                } else {
+                    phases.forEach { phase ->
+                        PhaseItem(phase = phase, canPay = canRegisterPayments, onPay = { onPayPhase(phase) })
                     }
                 }
             }
@@ -462,21 +450,13 @@ private fun ProviderAccountCard(
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
-                        onClick = onAddService, modifier = Modifier.weight(1f),
+                        onClick = onAddService, modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF5C6BC0)),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF5C6BC0))
                     ) {
                         Icon(Icons.Default.AddCard, null, modifier = Modifier.size(15.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Cliente Pagó", style = MaterialTheme.typography.labelSmall)
-                    }
-                    Button(
-                        onClick = onAddPayment, modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Teal)
-                    ) {
-                        Icon(Icons.Default.AttachMoney, null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Abonar", style = MaterialTheme.typography.labelSmall)
+                        Text("Registrar Abono del Cliente", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -502,21 +482,29 @@ private fun PhaseItem(phase: PaymentPhase, canPay: Boolean, onPay: () -> Unit) {
     val dateFmt = SimpleDateFormat("dd/MM/yyyy", Locale("es", "MX"))
     val isPaid = phase.status == PaymentPhaseStatus.PAGADO
 
+    val now = System.currentTimeMillis()
+    val daysUntil = (phase.scheduledDate - now) / 86400000L
+    val isNear = daysUntil <= 5
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clip(RoundedCornerShape(8.dp)).background(SurfaceGray.copy(alpha = 0.5f)).padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text("Fase ${phase.phaseNumber} de ${phase.totalPhases}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Navy)
-            Text("Vence: ${dateFmt.format(Date(phase.scheduledDate))}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+            Text("Programado: ${dateFmt.format(Date(phase.scheduledDate))}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
         }
         Text(fmt.format(phase.amountToPay), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.ExtraBold, color = if (isPaid) Teal else Navy, modifier = Modifier.padding(horizontal = 8.dp))
         
         if (isPaid) {
             Icon(Icons.Default.CheckCircle, null, tint = Teal, modifier = Modifier.size(20.dp))
         } else if (canPay) {
-            IconButton(onClick = onPay, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Payments, null, tint = Navy)
+            if (isNear || daysUntil < 0) {
+                IconButton(onClick = onPay, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Payments, null, tint = Teal)
+                }
+            } else {
+                Text("En $daysUntil días", style = MaterialTheme.typography.labelSmall, color = WarningAmber, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -669,6 +657,26 @@ fun TransactionDialog(providerName: String, isPayment: Boolean, onDismiss: () ->
                 if (amountStr.isNotEmpty() && !isValid) {
                     Text("Ingresa un monto válido", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                 }
+                
+                if (!isPayment && isValid && parsedAmount != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(shape = RoundedCornerShape(8.dp), color = Navy.copy(alpha = 0.05f), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
+                            Text("División Automática (50/50):", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Navy)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Para VG Tech:", style = MaterialTheme.typography.bodySmall, color = Teal)
+                                Text(fmt.format(parsedAmount * 0.5), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Teal)
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Para Proveedor:", style = MaterialTheme.typography.bodySmall, color = Color(0xFF5C6BC0))
+                                Text(fmt.format(parsedAmount * 0.5), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color(0xFF5C6BC0))
+                            }
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Descripción") }, modifier = Modifier.fillMaxWidth())
             }
@@ -807,6 +815,7 @@ fun ManagePhasesDialog(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text("Fase ${phase.phaseNumber}/${phase.totalPhases}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
                                     Text(fmt.format(phase.amountToPay), color = Navy, style = MaterialTheme.typography.labelSmall)
+                                    Text("Programado: ${SimpleDateFormat("dd/MM/yyyy", Locale("es", "MX")).format(Date(phase.scheduledDate))}", style = MaterialTheme.typography.labelSmall, color = TextMuted)
                                 }
                                 IconButton(onClick = { onDeletePhase(phase.id) }) {
                                     Icon(Icons.Default.Delete, null, tint = Color.Red, modifier = Modifier.size(20.dp))
@@ -833,34 +842,49 @@ fun AddPhaseForm(
     var phaseNum by remember { mutableStateOf("") }
     var totalPhases by remember { mutableStateOf("") }
     var selectedProject by remember { mutableStateOf(projects.firstOrNull()) }
-    var expanded by remember { mutableStateOf(false) }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val calendar = remember { Calendar.getInstance() }
+    var selectedDate by remember { mutableStateOf(calendar.timeInMillis) }
+    val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale("es", "MX")) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Nueva Fase de Pago", fontWeight = FontWeight.Bold, color = Teal)
-        
-        ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
-            OutlinedTextField(
-                value = selectedProject?.title ?: "Sin proyectos",
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Proyecto") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier.menuAnchor().fillMaxWidth()
-            )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                projects.forEach { project ->
-                    DropdownMenuItem(
-                        text = { Text(project.title) },
-                        onClick = { selectedProject = project; expanded = false }
-                    )
-                }
-            }
-        }
 
         OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Monto ($)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(value = phaseNum, onValueChange = { phaseNum = it }, label = { Text("Fase #") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
             OutlinedTextField(value = totalPhases, onValueChange = { totalPhases = it }, label = { Text("Total Fases") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+        }
+
+        Box(modifier = Modifier.fillMaxWidth().clickable {
+            android.app.DatePickerDialog(
+                context,
+                { _, y, m, d ->
+                    val cal = Calendar.getInstance()
+                    cal.set(y, m, d)
+                    selectedDate = cal.timeInMillis
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+            ).show()
+        }) {
+            OutlinedTextField(
+                value = sdf.format(Date(selectedDate)),
+                onValueChange = {},
+                readOnly = true,
+                enabled = false,
+                label = { Text("Fecha de Pago Programada") },
+                trailingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                    disabledBorderColor = MaterialTheme.colorScheme.outline,
+                    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -877,7 +901,7 @@ fun AddPhaseForm(
                             phaseNumber = p,
                             totalPhases = t,
                             amountToPay = a,
-                            scheduledDate = System.currentTimeMillis() + (7 * 86400000L) // +1 week default
+                            scheduledDate = selectedDate
                         ))
                     }
                 },
