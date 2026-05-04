@@ -8,9 +8,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -806,14 +808,17 @@ fun ManagePhasesDialog(
         onDismissRequest = onDismiss,
         title = { Text("Fases de Pago: ${provider.providerName}", fontWeight = FontWeight.Bold) },
         text = {
-            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 450.dp)) {
                 if (showAddForm) {
                     AddPhaseForm(
                         providerId = provider.providerId,
                         projects = availableProjects,
                         totalProjectAmount = totalProjectAmount,
                         onCancel = { showAddForm = false },
-                        onSave = { onAddPhase(it); showAddForm = false }
+                        onSave = { list -> 
+                            list.forEach { onAddPhase(it) }
+                            showAddForm = false 
+                        }
                     )
                 } else {
                     Button(
@@ -822,7 +827,8 @@ fun ManagePhasesDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = Navy)
                     ) {
                         Icon(Icons.Default.Add, null)
-                        Text("Nueva Fase")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Configuración de Fases")
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -850,6 +856,11 @@ fun ManagePhasesDialog(
     )
 }
 
+private data class PhaseInputData(
+    val amount: String,
+    val date: Long
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPhaseForm(
@@ -857,83 +868,137 @@ fun AddPhaseForm(
     projects: List<Project>,
     totalProjectAmount: Double,
     onCancel: () -> Unit,
-    onSave: (PaymentPhase) -> Unit
+    onSave: (List<PaymentPhase>) -> Unit
 ) {
-    var amount by remember { mutableStateOf("") }
-    var phaseNum by remember { mutableStateOf("") }
-    var totalPhases by remember { mutableStateOf("") }
+    var numPhasesStr by remember { mutableStateOf("") }
     var selectedProject by remember { mutableStateOf(projects.firstOrNull()) }
+    
+    // State for each phase
+    var phaseInputs by remember { mutableStateOf(listOf<PhaseInputData>()) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
-    val calendar = remember { Calendar.getInstance() }
-    var selectedDate by remember { mutableStateOf(calendar.timeInMillis) }
     val sdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale("es", "MX")) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Nueva Fase de Pago", fontWeight = FontWeight.Bold, color = Teal)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Configuración Dinámica de Fases", fontWeight = FontWeight.Bold, color = Teal)
 
         if (totalProjectAmount > 0) {
             val fmt = NumberFormat.getCurrencyInstance(Locale("es", "MX"))
-            Text("Total a pagar del proyecto: ${fmt.format(totalProjectAmount)}", style = MaterialTheme.typography.labelSmall, color = Navy, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(4.dp))
+            Text("Monto por cubrir: ${fmt.format(totalProjectAmount)}", style = MaterialTheme.typography.labelSmall, color = Navy, fontWeight = FontWeight.Bold)
         }
 
-        OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Abono Acordado ($)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth())
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(value = phaseNum, onValueChange = { phaseNum = it }, label = { Text("Fase #") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-            OutlinedTextField(value = totalPhases, onValueChange = { totalPhases = it }, label = { Text("Total Fases") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-        }
+        OutlinedTextField(
+            value = numPhasesStr,
+            onValueChange = { input ->
+                val filtered = input.filter { it.isDigit() }
+                numPhasesStr = filtered
+                val n = filtered.toIntOrNull() ?: 0
+                if (n > 0) {
+                    val newList = List(n) { i ->
+                        phaseInputs.getOrNull(i) ?: PhaseInputData(amount = "", date = System.currentTimeMillis())
+                    }
+                    phaseInputs = newList
+                } else {
+                    phaseInputs = emptyList()
+                }
+            },
+            label = { Text("¿Cuántas fases de pago tendrá?") },
+            placeholder = { Text("Ej: 3") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(10.dp)
+        )
 
-        Box(modifier = Modifier.fillMaxWidth().clickable {
-            android.app.DatePickerDialog(
-                context,
-                { _, y, m, d ->
-                    val cal = Calendar.getInstance()
-                    cal.set(y, m, d)
-                    selectedDate = cal.timeInMillis
-                },
-                calendar.get(Calendar.YEAR),
-                calendar.get(Calendar.MONTH),
-                calendar.get(Calendar.DAY_OF_MONTH)
-            ).show()
-        }) {
-            OutlinedTextField(
-                value = sdf.format(Date(selectedDate)),
-                onValueChange = {},
-                readOnly = true,
-                enabled = false,
-                label = { Text("Fecha de Pago Programada") },
-                trailingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                    disabledBorderColor = MaterialTheme.colorScheme.outline,
-                    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            )
+        if (phaseInputs.isNotEmpty()) {
+            phaseInputs.forEachIndexed { index, phase ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F4F8)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Fase ${index + 1}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Navy)
+                        
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = phase.amount,
+                                onValueChange = { newVal ->
+                                    val updated = phaseInputs.toMutableList()
+                                    updated[index] = updated[index].copy(amount = newVal.filter { it.isDigit() || it == '.' })
+                                    phaseInputs = updated
+                                },
+                                label = { Text("Monto") },
+                                placeholder = { Text("0.00") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.weight(1.2f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+
+                            Box(modifier = Modifier.weight(1f).clickable {
+                                val cal = Calendar.getInstance()
+                                cal.timeInMillis = phase.date
+                                android.app.DatePickerDialog(
+                                    context,
+                                    { _, y, m, d ->
+                                        val c = Calendar.getInstance()
+                                        c.set(y, m, d)
+                                        val updated = phaseInputs.toMutableList()
+                                        updated[index] = updated[index].copy(date = c.timeInMillis)
+                                        phaseInputs = updated
+                                    },
+                                    cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)
+                                ).show()
+                            }) {
+                                OutlinedTextField(
+                                    value = sdf.format(Date(phase.date)),
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    enabled = false,
+                                    label = { Text("Fecha") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             TextButton(onClick = onCancel) { Text("Cancelar") }
             Button(
                 onClick = {
-                    val a = amount.replace(",",".").toDoubleOrNull() ?: 0.0
-                    val p = phaseNum.toIntOrNull() ?: 1
-                    val t = totalPhases.toIntOrNull() ?: 1
-                    if (a > 0 && selectedProject != null) {
-                        onSave(PaymentPhase(
-                            providerId = providerId,
-                            projectId = selectedProject!!.id,
-                            phaseNumber = p,
-                            totalPhases = t,
-                            amountToPay = a,
-                            scheduledDate = selectedDate
-                        ))
+                    val n = numPhasesStr.toIntOrNull() ?: 0
+                    if (n > 0 && selectedProject != null) {
+                        val result = phaseInputs.mapIndexed { i, input ->
+                            PaymentPhase(
+                                providerId = providerId,
+                                projectId = selectedProject!!.id,
+                                phaseNumber = i + 1,
+                                totalPhases = n,
+                                amountToPay = input.amount.toDoubleOrNull() ?: 0.0,
+                                scheduledDate = input.date
+                            )
+                        }
+                        onSave(result)
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Teal)
-            ) { Text("Agregar") }
+                colors = ButtonDefaults.buttonColors(containerColor = Teal),
+                enabled = phaseInputs.isNotEmpty() && phaseInputs.all { it.amount.isNotBlank() }
+            ) {
+                Text("Generar Todo")
+            }
         }
     }
 }
