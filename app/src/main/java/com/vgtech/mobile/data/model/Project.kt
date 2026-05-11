@@ -22,6 +22,7 @@ data class Project(
     val comments: String = "",           // General comments or feedback
     val hasDelays: Boolean = false,
     val delayReason: String = "",
+    val delayResponsible: String = "", // "Proveedor", "Consultor" o ""
     val providerRating: Float = 0f,      // Rating for the provider (1-5)
     val consultantRating: Float = 0f,    // Rating received by the consultant
     val evaluationResult: String = "",   // Result/Outcome of the project evaluation

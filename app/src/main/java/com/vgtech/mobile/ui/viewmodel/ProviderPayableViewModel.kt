@@ -41,7 +41,6 @@ class ProviderPayableViewModel(application: Application) : AndroidViewModel(appl
 
     init {
         loadData()
-        observeAllTransactions()
         observeProjects()
     }
 
@@ -51,13 +50,7 @@ class ProviderPayableViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    private fun observeAllTransactions() {
-        viewModelScope.launch {
-            InternalDb.providerTransactions.collect { list ->
-                _allTransactions.value = list.sortedByDescending { it.timestamp }
-            }
-        }
-    }
+    // Removed observeAllTransactions as loadData handles it now.
 
     private fun loadData() {
         viewModelScope.launch {
@@ -65,9 +58,9 @@ class ProviderPayableViewModel(application: Application) : AndroidViewModel(appl
             try {
                 combine(
                     employeeRepository.getEmployees(),
-                    InternalDb.providerTransactions,
-                    InternalDb.paymentPhases
-                ) { employees, transactions, phases ->
+                    transactionRepository.getAllTransactions(),
+                    transactionRepository.getAllPhases()
+                ) { employees: List<Employee>, transactions: List<ProviderTransaction>, phases: List<PaymentPhase> ->
                     Triple(employees, transactions, phases)
                 }.collect { (allEmployees, allTransactions, allPhases) ->
                     val providers = allEmployees.filter { it.puesto.equals("Proveedor", ignoreCase = true) }
@@ -75,6 +68,7 @@ class ProviderPayableViewModel(application: Application) : AndroidViewModel(appl
                     
                     val phaseMap = allPhases.groupBy { it.providerId }
                     _providerPhases.value = phaseMap
+                    _allTransactions.value = allTransactions.sortedByDescending { it.timestamp }
 
                     val summaries = providers.map { provider ->
                         val providerTxs = allTransactions.filter { it.providerId == provider.uid }
@@ -113,28 +107,40 @@ class ProviderPayableViewModel(application: Application) : AndroidViewModel(appl
 
     fun registerService(providerId: String, clientPayment: Double, description: String, projectId: String? = null) {
         viewModelScope.launch {
-            try { transactionRepository.addServiceTransaction(providerId, clientPayment, description, projectId) }
+            try { 
+                transactionRepository.addServiceTransaction(providerId, clientPayment, description, projectId)
+                loadData()
+            }
             catch (e: Exception) { _error.value = "Error al registrar servicio: ${e.message}" }
         }
     }
 
     fun registerPayment(providerId: String, amountPaid: Double, description: String, projectId: String? = null, phaseId: String? = null) {
         viewModelScope.launch {
-            try { transactionRepository.addPaymentTransaction(providerId, amountPaid, description, projectId, phaseId) }
+            try { 
+                transactionRepository.addPaymentTransaction(providerId, amountPaid, description, projectId, phaseId)
+                loadData()
+            }
             catch (e: Exception) { _error.value = "Error al registrar abono: ${e.message}" }
         }
     }
 
     fun addPaymentPhase(phase: PaymentPhase) {
         viewModelScope.launch {
-            try { transactionRepository.createPaymentPhase(phase) }
+            try { 
+                transactionRepository.createPaymentPhase(phase)
+                loadData()
+            }
             catch (e: Exception) { _error.value = "Error al crear fase: ${e.message}" }
         }
     }
 
     fun removePaymentPhase(phaseId: String) {
         viewModelScope.launch {
-            try { transactionRepository.deletePaymentPhase(phaseId) }
+            try { 
+                transactionRepository.deletePaymentPhase(phaseId)
+                loadData()
+            }
             catch (e: Exception) { _error.value = "Error al eliminar fase: ${e.message}" }
         }
     }

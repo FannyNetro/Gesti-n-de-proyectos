@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private val authRepository = AuthRepository()
+    private val employeeRepository = com.vgtech.mobile.data.repository.EmployeeRepository()
 
     // ── UI State ─────────────────────────────────────────────────────
 
@@ -34,17 +35,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _authState.value = AuthState.Unauthenticated
             return
         }
-        viewModelScope.launch {
-            _authState.value = AuthState.Loading
-            try {
-                val role = authRepository.getUserRole(user.uid)
-                _authState.value = AuthState.Success(role)
-            } catch (e: Exception) {
-                // Session exists but profile missing — force logout
-                authRepository.signOut()
-                _authState.value = AuthState.Unauthenticated
-            }
-        }
+        // El rol ya está disponible desde el currentUser almacenado en memoria
+        _authState.value = AuthState.Success(user.toRole())
     }
 
     // ── Sign In ──────────────────────────────────────────────────────
@@ -105,7 +97,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     password = password,
                     puesto = puesto
                 )
-                val role = authRepository.signUp(employee)
+                // Registrar vía API y luego hacer login automático
+                employeeRepository.registerEmployee(employee)
+                val role = authRepository.signIn(trimmedEmail, password)
                 _authState.value = AuthState.Success(role)
             } catch (e: Exception) {
                 _authState.value = AuthState.Error(

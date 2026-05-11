@@ -111,7 +111,7 @@ fun SupervisorDashboardScreen(
                     "Proyectos" -> ProjectsTab(projects, consultants, providers, invitations, quotations)
                     "Cotizaciones" -> SupervisorQuotationsTab(projects, providers)
                     "Pagos" -> SupervisorProjectPaymentsTab(projects, phases)
-                    "Avances" -> ProgressTab(projects, progressReports)
+                    "Avances" -> ProgressTab(projects, progressReports, consultants, providers)
                     "Evaluar" -> EvaluationsTab(projects, consultants, providers, evaluations)
                     "Reportes" -> ReportsTab(projects, consultants, providers, progressReports, evaluations)
                     "Chat" -> SupervisorChatTab(projects, consultants, providers, clients, quotations)
@@ -576,7 +576,9 @@ private fun ProjectsTab(
 @Composable
 private fun ProgressTab(
     projects: List<Project>,
-    progressReports: List<ProjectProgress>
+    progressReports: List<ProjectProgress>,
+    consultants: List<Employee>,
+    providers: List<Employee>
 ) {
     val dateFormat = remember { SimpleDateFormat("dd MMM yyyy  HH:mm", Locale("es", "MX")) }
 
@@ -629,6 +631,16 @@ private fun ProgressTab(
                     // Delay warning
                     if (project.hasDelays) {
                         Spacer(modifier = Modifier.height(8.dp))
+                        val responsibleName = when (project.delayResponsible) {
+                            "Proveedor" -> providers.find { it.uid == project.providerUid }?.nombreCompleto ?: project.providerName
+                            "Consultor" -> consultants.find { it.uid == project.consultantUid }?.nombreCompleto ?: "Consultor asignado"
+                            else -> null
+                        }
+                        val responsibleLabel = when (project.delayResponsible) {
+                            "Proveedor" -> "Retraso de Proveedor"
+                            "Consultor" -> "Retraso por Consultor"
+                            else -> "Retraso detectado"
+                        }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -640,9 +652,17 @@ private fun ProgressTab(
                             Icon(Icons.Default.Warning, null, tint = ErrorRed, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
-                                Text("Retraso detectado", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = ErrorRed)
+                                Text(responsibleLabel, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = ErrorRed)
+                                if (responsibleName != null) {
+                                    Text(
+                                        responsibleName,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Navy
+                                    )
+                                }
                                 if (project.delayReason.isNotBlank()) {
-                                    Text(project.delayReason, style = MaterialTheme.typography.bodySmall, color = Navy)
+                                    Text(project.delayReason, style = MaterialTheme.typography.bodySmall, color = TextMuted)
                                 }
                             }
                         }
@@ -934,7 +954,18 @@ private fun ReportsTab(
                         }
                     }
                     if (project.hasDelays) {
-                        Text("⚠ Retraso: ${project.delayReason}", style = MaterialTheme.typography.labelSmall, color = ErrorRed, modifier = Modifier.padding(top = 4.dp))
+                        val responsibleName = when (project.delayResponsible) {
+                            "Proveedor" -> provider?.nombreCompleto ?: project.providerName
+                            "Consultor" -> consultant?.nombreCompleto ?: "Consultor asignado"
+                            else -> null
+                        }
+                        val responsibleLabel = when (project.delayResponsible) {
+                            "Proveedor" -> "⚠ Retraso de Proveedor"
+                            "Consultor" -> "⚠ Retraso por Consultor"
+                            else -> "⚠ Retraso"
+                        }
+                        val displayText = if (responsibleName != null) "$responsibleLabel: $responsibleName" else "$responsibleLabel: ${project.delayReason}"
+                        Text(displayText, style = MaterialTheme.typography.labelSmall, color = ErrorRed, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
             }

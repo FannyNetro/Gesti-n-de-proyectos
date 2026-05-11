@@ -558,6 +558,33 @@ fun ProjectKanbanCard(project: Project) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Text("${(project.progress * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = Navy)
             }
+
+            // Delay banner
+            if (project.hasDelays) {
+                Spacer(modifier = Modifier.height(10.dp))
+                val responsibleLabel = when (project.delayResponsible) {
+                    "Proveedor" -> "⚠ Retraso de Proveedor"
+                    "Consultor" -> "⚠ Retraso por Consultor"
+                    else -> "⚠ Retraso Detectado"
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ErrorRed.copy(alpha = 0.08f))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Warning, null, tint = ErrorRed, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(responsibleLabel, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = ErrorRed)
+                        if (project.delayReason.isNotBlank()) {
+                            Text(project.delayReason, style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        }
+                    }
+                }
+            }
             
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -617,6 +644,7 @@ fun ProjectKanbanCard(project: Project) {
         }
     }
 }
+
 
 @Composable
 fun ProviderHistoryScreen(myProjects: List<Project>) {
@@ -744,16 +772,23 @@ fun ProjectDetailDialog(project: Project, title: String, isProviderFocus: Boolea
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Delays
+                // Delays - mejorado con responsable
                 if (project.hasDelays) {
+                    val responsibleLabel = when (project.delayResponsible) {
+                        "Proveedor" -> "Retraso de Proveedor"
+                        "Consultor" -> "Retraso por Consultor"
+                        else -> "Retraso Detectado"
+                    }
                     Surface(color = ErrorRed.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Warning, null, tint = ErrorRed, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Retraso Detectado", color = ErrorRed, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                                Text(responsibleLabel, color = ErrorRed, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
                             }
-                            Text(project.delayReason, style = MaterialTheme.typography.bodySmall, color = ErrorRed)
+                            if (project.delayReason.isNotBlank()) {
+                                Text(project.delayReason, style = MaterialTheme.typography.bodySmall, color = ErrorRed.copy(alpha = 0.8f))
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))

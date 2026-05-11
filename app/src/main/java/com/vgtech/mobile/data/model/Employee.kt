@@ -19,7 +19,8 @@ data class Employee(
     val fechaRegistro: Long      = System.currentTimeMillis(),
     val activo: Boolean          = true,
     val tipoTrabajo: List<String> = emptyList(), // For Proveedor category tags
-    val motivoInactivo: String   = ""
+    val motivoInactivo: String   = "",
+    val fotoBase64: String?      = null
 ) {
     /** Map roles to navigation destinations */
     fun toRole(): UserRole = when (puesto.lowercase()) {
@@ -46,7 +47,8 @@ data class Employee(
         "fechaRegistro"    to fechaRegistro,
         "activo"           to activo,
         "tipoTrabajo"      to tipoTrabajo,
-        "motivoInactivo"   to motivoInactivo
+        "motivoInactivo"   to motivoInactivo,
+        "fotoBase64"       to (fotoBase64 ?: "")
     )
 }
 

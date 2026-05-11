@@ -1,8 +1,13 @@
 package com.vgtech.mobile.ui.screens.rh
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -12,8 +17,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import android.graphics.Bitmap
+import android.util.Base64
+import java.io.ByteArrayOutputStream
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vgtech.mobile.data.model.Employee
@@ -37,6 +48,13 @@ fun EmployeeRegistrationScreen(
     var sueldo by remember { mutableStateOf("") }
     var diasVacaciones by remember { mutableStateOf("") }
     val tipoTrabajo = remember { mutableStateListOf<String>() }
+    var fotoBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        if (bitmap != null) {
+            fotoBitmap = bitmap
+        }
+    }
 
     val isLoading by employeeViewModel.isLoading.collectAsState()
     val registrationState by employeeViewModel.registrationState.collectAsState()
@@ -79,6 +97,39 @@ fun EmployeeRegistrationScreen(
                 color = DarkBlue,
                 fontWeight = FontWeight.Bold
             )
+
+            // Camera Photo
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .background(Color.LightGray)
+                        .clickable { cameraLauncher.launch(null) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (fotoBitmap != null) {
+                        Image(
+                            bitmap = fotoBitmap!!.asImageBitmap(),
+                            contentDescription = "Foto del Empleado",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = "Tomar Foto",
+                            tint = Color.White,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = nombreCompleto,
@@ -225,6 +276,13 @@ fun EmployeeRegistrationScreen(
                 // Save
                 Button(
                     onClick = {
+                        var fotoBase64Str: String? = null
+                        if (fotoBitmap != null) {
+                            val baos = ByteArrayOutputStream()
+                            fotoBitmap!!.compress(Bitmap.CompressFormat.JPEG, 70, baos)
+                            fotoBase64Str = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+                        }
+
                         val employee = Employee(
                             nombreCompleto  = nombreCompleto.trim(),
                             email           = email.trim(),
@@ -234,7 +292,8 @@ fun EmployeeRegistrationScreen(
                             puesto          = puesto,
                             sueldo          = sueldo.toDoubleOrNull() ?: 0.0,
                             diasVacaciones  = diasVacaciones.toDoubleOrNull() ?: 0.0,
-                            tipoTrabajo     = tipoTrabajo.toList()
+                            tipoTrabajo     = tipoTrabajo.toList(),
+                            fotoBase64      = fotoBase64Str
                         )
                         employeeViewModel.registerEmployee(employee)
                     },

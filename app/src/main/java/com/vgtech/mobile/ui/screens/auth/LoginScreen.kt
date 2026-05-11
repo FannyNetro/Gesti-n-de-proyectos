@@ -365,6 +365,62 @@ fun LoginScreen(
                 )
             }
 
+            // ── Credenciales de acceso (modo desarrollo) ─────────
+            var showCredentials by remember { mutableStateOf(false) }
+            Spacer(modifier = Modifier.height(16.dp))
+            TextButton(onClick = { showCredentials = !showCredentials }) {
+                Text(
+                    if (showCredentials) "▲ Ocultar credenciales de prueba" else "▼ Ver credenciales de acceso",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.5f)
+                )
+            }
+            if (showCredentials) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.08f))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Accesos del sistema", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val credenciales = listOf(
+                            Triple("Supervisor",    "supervisor@vgtech.com", "super"),
+                            Triple("Consultor",     "consultor@vgtech.com",  "cons"),
+                            Triple("Proveedor",     "proveedor@vgtech.com",  "prov"),
+                            Triple("Cliente",       "cliente@vgtech.com",    "cli"),
+                            Triple("RH / Admin",    "admin@vgtech.com",      "admin")
+                        )
+                        credenciales.forEach { (rol, correo, clave) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(rol, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f))
+                                    Text(correo, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                                }
+                                Surface(
+                                    color = Color.White.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        clave,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Mustard
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(48.dp))
         }
     }

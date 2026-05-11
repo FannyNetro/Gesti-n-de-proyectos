@@ -1,83 +1,57 @@
 package com.vgtech.mobile.data.repository
 
-import com.vgtech.mobile.data.local.InternalDb
 import com.vgtech.mobile.data.model.Employee
 import com.vgtech.mobile.data.model.UserRole
-import java.util.UUID
+import com.vgtech.mobile.network.RetrofitClient
+import com.vgtech.mobile.network.dto.LoginRequestDto
+import com.vgtech.mobile.network.dto.LoginResponseDto
 
 /**
- * AuthRepository — handles Internal Authentication and role resolution.
+ * AuthRepository — conectado a PostgreSQL vía API REST Ktor.
+ * Reemplaza el InternalDb local por llamadas HTTP.
  */
 class AuthRepository {
 
-    // ── Current Session ──────────────────────────────────────────────
-
+    // ── Sesión actual ────────────────────────────────────────────────────
     var currentUser: Employee? = null
         private set
 
-    // ── Sign In ──────────────────────────────────────────────────────
+    // ── Login ────────────────────────────────────────────────────────────
 
-    fun signIn(email: String, password: String): UserRole {
-        val user = InternalDb.getEmployeeByEmail(email)
-            ?: throw Exception("Usuario no encontrado")
+    /**
+     * Llama a POST /auth/login con email y password.
+     * Lanza excepción si las credenciales son incorrectas o el usuario está inactivo.
+     */
+    suspend fun signIn(email: String, password: String): UserRole {
+        val response = RetrofitClient.api.login(LoginRequestDto(email, password))
 
-        if (user.password != password) {
-            throw Exception("Contraseña incorrecta")
-        }
-        
-        if (!user.activo) {
-            throw Exception("El usuario está inactivo")
-        }
-
-        currentUser = user
-        return getUserRole(user.uid)
-    }
-
-    // ── Role Resolution ──────────────────────────────────────────────
-
-    fun getUserRole(uid: String): UserRole {
-        val user = InternalDb.getEmployeeById(uid)
-            ?: throw Exception("Perfil de empleado no encontrado")
-        return user.toRole()
-    }
-
-    // ── Employee Registration ────────────────────────────────────────
-
-    fun registerEmployee(
-        employee: Employee
-    ): String {
-        // Enforce uniqueness for email
-        if (InternalDb.getEmployeeByEmail(employee.email) != null) {
-            throw Exception("El correo electrónico ya está registrado")
+        if (!response.isSuccessful) {
+            val errorMsg = when (response.code()) {
+                401  -> "Credenciales incorrectas"
+                403  -> "Usuario inactivo"
+                else -> "Error de servidor: ${response.code()}"
+            }
+            throw Exception(errorMsg)
         }
 
-        val uid = UUID.randomUUID().toString()
-        val employeeWithUid = employee.copy(uid = uid)
-        
-        InternalDb.addEmployee(employeeWithUid)
-        return uid
+        val body = response.body() ?: throw Exception("Respuesta vacía del servidor")
+        currentUser = body.toEmployee()
+        return currentUser!!.toRole()
     }
 
-    // ── Self-Registration ────────────────────────────────────────────
-
-    fun signUp(employee: Employee): UserRole {
-        // Enforce uniqueness for email
-        if (InternalDb.getEmployeeByEmail(employee.email) != null) {
-            throw Exception("El correo electrónico ya está registrado")
-        }
-
-        val uid = UUID.randomUUID().toString()
-        val employeeWithUid = employee.copy(uid = uid)
-        
-        InternalDb.addEmployee(employeeWithUid)
-        currentUser = employeeWithUid // Auto log-in upon sign-up
-
-        return employeeWithUid.toRole()
-    }
-
-    // ── Sign Out ─────────────────────────────────────────────────────
+    // ── Logout ───────────────────────────────────────────────────────────
 
     fun signOut() {
         currentUser = null
     }
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    private fun LoginResponseDto.toEmployee() = Employee(
+        uid            = uid,
+        nombreCompleto = nombreCompleto,
+        email          = email,
+        puesto         = puesto,
+        activo         = activo
+    )
 }

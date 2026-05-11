@@ -101,7 +101,7 @@ class EmployeeViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             _registrationState.value = RegistrationState.Loading
             try {
-                val uid = authRepository.registerEmployee(
+                val uid = employeeRepository.registerEmployee(
                     employee = employee
                 )
                 _registrationState.value = RegistrationState.Success(uid)

@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -349,6 +350,33 @@ fun ProjectCard(project: Project, onClick: () -> Unit, onReportClick: () -> Unit
             
             Spacer(modifier = Modifier.height(16.dp))
             
+            // Delay banner
+            if (project.hasDelays) {
+                val responsibleLabel = when (project.delayResponsible) {
+                    "Proveedor" -> "⚠ Retraso de Proveedor"
+                    "Consultor" -> "⚠ Retraso por Consultor"
+                    else -> "⚠ Retraso Detectado"
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Red.copy(alpha = 0.07f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(responsibleLabel, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.Red)
+                        if (project.delayReason.isNotBlank()) {
+                            Text(project.delayReason, style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            
             Button(
                 onClick = onReportClick,
                 modifier = Modifier.fillMaxWidth(),
@@ -398,6 +426,33 @@ fun ProjectDetailDialog(project: Project, onDismiss: () -> Unit, onReportProgres
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
+
+                // Delay banner in detail
+                if (project.hasDelays) {
+                    val responsibleLabel = when (project.delayResponsible) {
+                        "Proveedor" -> "Retraso de Proveedor"
+                        "Consultor" -> "Retraso por Consultor"
+                        else -> "Retraso Detectado"
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.Red.copy(alpha = 0.08f))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(responsibleLabel, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.Red)
+                            if (project.delayReason.isNotBlank()) {
+                                Text(project.delayReason, style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
                 Button(
                     onClick = { onReportProgress(project) },

@@ -23,14 +23,17 @@ import com.vgtech.mobile.data.local.InternalDb
 import com.vgtech.mobile.data.model.Employee
 import com.vgtech.mobile.data.model.WorkLog
 import com.vgtech.mobile.ui.theme.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.vgtech.mobile.ui.viewmodel.SalaryControlViewModel
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun SalaryControlScreen() {
-    val employees by InternalDb.employees.collectAsState()
-    val workLogs by InternalDb.workLogs.collectAsState()
+fun SalaryControlScreen(viewModel: SalaryControlViewModel = viewModel()) {
+    val employees by viewModel.employees.collectAsState()
+    val workLogs by viewModel.workLogs.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
     
     var searchQuery by remember { mutableStateOf("") }
     val selectedEmployeeState = remember { mutableStateOf<Employee?>(null) }
@@ -64,12 +67,19 @@ fun SalaryControlScreen() {
                         color = Color.White,
                         fontWeight = FontWeight.Bold
                     )
-                    IconButton(onClick = { showWorkLogs = !showWorkLogs }) {
-                        Icon(
-                            if (showWorkLogs) Icons.Default.People else Icons.AutoMirrored.Filled.ReceiptLong,
-                            contentDescription = "Ver Pagos",
-                            tint = Color.White
-                        )
+                    Row {
+                        IconButton(onClick = { 
+                            com.vgtech.mobile.utils.PayrollPdfGenerator.generateGlobalPayrollPdf(context, filteredEmployees, workLogs)
+                        }) {
+                            Icon(Icons.Default.Print, contentDescription = "Nómina Global", tint = Color.White)
+                        }
+                        IconButton(onClick = { showWorkLogs = !showWorkLogs }) {
+                            Icon(
+                                if (showWorkLogs) Icons.Default.People else Icons.AutoMirrored.Filled.ReceiptLong,
+                                contentDescription = "Ver Pagos",
+                                tint = Color.White
+                            )
+                        }
                     }
                 }
                 
@@ -127,20 +137,37 @@ fun SalaryControlScreen() {
     selectedEmployeeState.value?.let { employee ->
         ManageSalaryDialog(
             employee = employee,
+            workLogs = workLogs,
             onDismiss = { selectedEmployeeState.value = null },
             onConfirmAddHours = { hours, rate, obs ->
-                InternalDb.addWorkLog(WorkLog(
-                    employeeUid = employee.uid,
-                    employeeName = employee.nombreCompleto,
-                    hoursWorked = hours,
-                    hourlyRateAtTime = rate,
-                    observations = obs
-                ))
-                selectedEmployeeState.value = null
+                val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                // Get overtime info (already processed in AddHoursContent)
+                val overtimeHoursStr = obs.substringAfter("ovh:", "0.0").substringBefore(";", "0.0")
+                val overtimeRateStr = obs.substringAfter("ovr:", "200").substringBefore(";", "200")
+                val ovh = overtimeHoursStr.toDoubleOrNull() ?: 0.0
+                val ovr = (overtimeRateStr.toDoubleOrNull() ?: 200.0) / 100.0
+                val cleanObs = obs.replace(Regex("ovh:.*?;|ovr:.*?;"), "").trim()
+                
+                viewModel.addWorkLog(
+                    empleadoUid = employee.uid,
+                    fecha = dateStr,
+                    horasTrabajadas = hours,
+                    horasExtra = ovh,
+                    tarifaExtra = ovr,
+                    tarifaHora = rate,
+                    observaciones = cleanObs,
+                    onSuccess = { selectedEmployeeState.value = null },
+                    onError = { /* show error */ }
+                )
             },
             onUpdateRates = { sueldo, hourly ->
-                InternalDb.updateEmployeeRates(employee.uid, sueldo, hourly)
-                selectedEmployeeState.value = null
+                viewModel.updateEmployeeRates(
+                    uid = employee.uid,
+                    sueldo = sueldo,
+                    hourlyRate = hourly,
+                    onSuccess = { selectedEmployeeState.value = null },
+                    onError = { /* show error */ }
+                )
             }
         )
     }
@@ -209,6 +236,7 @@ fun WorkLogItem(log: WorkLog, formatter: NumberFormat) {
 @Composable
 fun ManageSalaryDialog(
     employee: Employee,
+    workLogs: List<WorkLog>,
     onDismiss: () -> Unit,
     onConfirmAddHours: (Double, Double, String) -> Unit,
     onUpdateRates: (Double, Double) -> Unit
@@ -247,8 +275,20 @@ fun ManageSalaryDialog(
                     UpdateSalaryContent(employee, onUpdateRates)
                 }
                 
-                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                    Text("Cerrar", color = Navy)
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val empWorkLogs = workLogs.filter { it.employeeUid == employee.uid }
+
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { 
+                        com.vgtech.mobile.utils.PayrollPdfGenerator.generateEmployeePayrollPdf(context, employee, empWorkLogs)
+                    }) {
+                        Icon(Icons.Default.Print, contentDescription = null, tint = Teal)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Descargar PDF", color = Teal)
+                    }
+                    TextButton(onClick = onDismiss) {
+                        Text("Cerrar", color = Navy)
+                    }
                 }
             }
         }
@@ -334,16 +374,8 @@ fun AddHoursContent(employee: Employee, onConfirm: (Double, Double, String) -> U
             onClick = {
                 // We pass overtime info via the observation and handle in the caller
                 val h = hours.toDoubleOrNull() ?: 0.0
-                InternalDb.addWorkLog(WorkLog(
-                    employeeUid = employee.uid,
-                    employeeName = employee.nombreCompleto,
-                    hoursWorked = h,
-                    overtimeHours = overtimeVal,
-                    overtimeRate = overtimeMultiplier,
-                    hourlyRateAtTime = hourlyRate,
-                    observations = obs
-                ))
-                onConfirm(h, hourlyRate, obs)
+                val payloadObs = "ovh:${overtimeVal};ovr:${overtimeRatePercent};${obs}"
+                onConfirm(h, hourlyRate, payloadObs)
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = Teal),

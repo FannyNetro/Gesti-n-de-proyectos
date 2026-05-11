@@ -1,9 +1,10 @@
 package com.vgtech.mobile.data.repository
 
-import com.vgtech.mobile.data.local.InternalDb
 import com.vgtech.mobile.data.model.*
+import com.vgtech.mobile.network.RetrofitClient
+import com.vgtech.mobile.network.dto.*
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flow
 
 class ProviderPayableRepository {
 
@@ -24,23 +25,20 @@ class ProviderPayableRepository {
         val companyCut = clientPayment * defaultCompanyShare
         val providerCut = clientPayment * defaultProviderShare
 
-        val transaction = ProviderTransaction(
-            providerId = providerId,
-            projectId = projectId,
-            type = TransactionType.SERVICE,
-            rawAmount = clientPayment,
-            companyCut = companyCut,
-            providerCut = providerCut,
-            description = description
+        val req = CreateTransaccionDto(
+            proveedorId = providerId,
+            proyectoId = projectId,
+            tipo = "Servicio",
+            montoBruto = clientPayment,
+            corteEmpresa = companyCut,
+            corteProveedor = providerCut,
+            descripcion = description
         )
-
-        InternalDb.addProviderTransaction(transaction)
-        return transaction.id
+        val response = RetrofitClient.api.createTransaccion(req)
+        if (!response.isSuccessful) throw Exception("Error al crear transacción")
+        return response.body()?.get("id") ?: ""
     }
 
-    /**
-     * Registra un abono/pago de la empresa al proveedor.
-     */
     suspend fun addPaymentTransaction(
         providerId: String, 
         amountPaid: Double, 
@@ -48,50 +46,85 @@ class ProviderPayableRepository {
         projectId: String? = null,
         phaseId: String? = null
     ): String {
-        val transaction = ProviderTransaction(
-            providerId = providerId,
-            projectId = projectId,
-            phaseId = phaseId,
-            type = TransactionType.PAYMENT,
-            rawAmount = amountPaid,
-            companyCut = 0.0,
-            providerCut = 0.0,
-            description = description
+        val req = CreateTransaccionDto(
+            proveedorId = providerId,
+            proyectoId = projectId,
+            faseId = phaseId,
+            tipo = "Pago",
+            montoBruto = amountPaid,
+            corteEmpresa = 0.0,
+            corteProveedor = 0.0,
+            descripcion = description
         )
-
-        InternalDb.addProviderTransaction(transaction)
-
-        // Update phase status if applicable
-        if (phaseId != null) {
-            val phase = InternalDb.paymentPhases.value.find { it.id == phaseId }
-            if (phase != null) {
-                InternalDb.updatePaymentPhase(phase.copy(status = PaymentPhaseStatus.PAGADO, paidDate = System.currentTimeMillis()))
-            }
-        }
+        val response = RetrofitClient.api.createTransaccion(req)
+        if (!response.isSuccessful) throw Exception("Error al crear transacción")
         
-        return transaction.id
+        if (phaseId != null) {
+            RetrofitClient.api.marcarFasePagada(phaseId)
+        }
+        return response.body()?.get("id") ?: ""
     }
 
-    /**
-     * Obtiene el flujo de transacciones para calcular saldos en tiempo real.
-     */
-    fun getTransactionsForProvider(providerId: String): Flow<List<ProviderTransaction>> {
-        return InternalDb.providerTransactions.map { list ->
-            list.filter { it.providerId == providerId }.sortedByDescending { it.timestamp }
+    fun getAllTransactions(): Flow<List<ProviderTransaction>> = flow {
+        val response = RetrofitClient.api.getTransacciones()
+        if (response.isSuccessful) {
+            val list = response.body()?.map { dto ->
+                ProviderTransaction(
+                    id = dto.id,
+                    providerId = dto.proveedorId,
+                    projectId = dto.proyectoId,
+                    phaseId = dto.faseId,
+                    type = if (dto.tipo == "Servicio") TransactionType.SERVICE else TransactionType.PAYMENT,
+                    rawAmount = dto.montoBruto,
+                    companyCut = dto.corteEmpresa,
+                    providerCut = dto.corteProveedor,
+                    description = dto.descripcion,
+                    timestamp = dto.timestamp
+                )
+            } ?: emptyList()
+            emit(list.sortedByDescending { it.timestamp })
+        } else {
+            emit(emptyList())
         }
     }
 
-    fun getPhasesForProvider(providerId: String): Flow<List<PaymentPhase>> {
-        return InternalDb.paymentPhases.map { list ->
-            list.filter { it.providerId == providerId }.sortedBy { it.scheduledDate }
+    fun getAllPhases(): Flow<List<PaymentPhase>> = flow {
+        val response = RetrofitClient.api.getFasesPago()
+        if (response.isSuccessful) {
+            val list = response.body()?.map { dto ->
+                PaymentPhase(
+                    id = dto.id,
+                    providerId = dto.proveedorId,
+                    projectId = dto.proyectoId,
+                    phaseNumber = dto.numeroFase,
+                    totalPhases = dto.totalFases,
+                    amountToPay = dto.montoAPagar,
+                    scheduledDate = dto.fechaProgramada,
+                    status = if (dto.estado == "PAGADO") PaymentPhaseStatus.PAGADO else PaymentPhaseStatus.PENDIENTE,
+                    paidDate = dto.fechaPago
+                )
+            } ?: emptyList()
+            emit(list.sortedBy { it.scheduledDate })
+        } else {
+            emit(emptyList())
         }
     }
 
     suspend fun createPaymentPhase(phase: PaymentPhase) {
-        InternalDb.addPaymentPhase(phase)
+        val req = CreateFasePagoDto(
+            proveedorId = phase.providerId,
+            proyectoId = phase.projectId,
+            numeroFase = phase.phaseNumber,
+            totalFases = phase.totalPhases,
+            montoAPagar = phase.amountToPay,
+            fechaProgramada = phase.scheduledDate
+        )
+        val res = RetrofitClient.api.createFasePago(req)
+        if (!res.isSuccessful) throw Exception("Error al crear fase de pago")
     }
 
     suspend fun deletePaymentPhase(phaseId: String) {
-        InternalDb.deletePaymentPhase(phaseId)
+        val res = RetrofitClient.api.deleteFasePago(phaseId)
+        if (!res.isSuccessful) throw Exception("Error al eliminar fase de pago")
     }
 }
