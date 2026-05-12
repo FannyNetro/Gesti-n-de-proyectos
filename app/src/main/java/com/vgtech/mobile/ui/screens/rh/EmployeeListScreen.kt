@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.sp
 import com.vgtech.mobile.data.model.Employee
 import com.vgtech.mobile.ui.theme.*
 import com.vgtech.mobile.ui.viewmodel.EmployeeViewModel
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
 
 /**
  * EmployeeListScreen — LazyColumn of employee cards with
@@ -385,9 +388,9 @@ private fun EmployeeCard(
                     var imageBitmap: androidx.compose.ui.graphics.ImageBitmap? = null
                     if (!employee.fotoBase64.isNullOrBlank()) {
                         try {
-                            val imageBytes = android.util.Base64.decode(employee.fotoBase64, android.util.Base64.DEFAULT)
-                            val bitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                            imageBitmap = bitmap?.let { androidx.compose.ui.graphics.asImageBitmap(it) }
+                            val imageBytes = Base64.decode(employee.fotoBase64, Base64.DEFAULT)
+                            val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                            imageBitmap = bitmap?.asImageBitmap()
                         } catch (e: Exception) {
                             // Ignored, will fallback to initials
                         }
