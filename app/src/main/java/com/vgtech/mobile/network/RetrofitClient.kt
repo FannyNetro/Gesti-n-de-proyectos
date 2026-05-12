@@ -9,8 +9,12 @@ import java.util.concurrent.TimeUnit
 object RetrofitClient {
 
     /**
-     * IP de tu PC en WiFi — ambos deben estar en la misma red.
-     * PC IP: 192.168.1.11  |  Puerto Ktor: 8080
+     * IMPORTANTE PARA EL EQUIPO:
+     * Si vas a correr el servidor Ktor (vgtech-backend) en tu propia computadora,
+     * debes cambiar esta IP por la IP de tu propia máquina en tu red Wi-Fi (ej. 192.168.x.x)
+     * o usar "http://10.0.2.2:8080/" si estás usando el emulador de Android Studio.
+     * 
+     * PC IP de Adrian: 192.168.1.11  |  Puerto Ktor: 8080
      */
     private const val BASE_URL = "http://192.168.1.11:8080/"
 
