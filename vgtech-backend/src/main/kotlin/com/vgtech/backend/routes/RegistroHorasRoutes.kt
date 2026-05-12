@@ -9,6 +9,7 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.javatime.*
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
@@ -73,16 +74,16 @@ fun Route.registroHorasRoutes() {
             val newId = UUID.randomUUID()
             transaction {
                 RegistroHoras.insert {
-                    it[id]              = newId
-                    it[empleadoUid]     = UUID.fromString(req.empleadoUid)
-                    it[fecha]           = java.time.LocalDate.parse(req.fecha)
-                    it[horasTrabajadas] = BigDecimal.valueOf(req.horasTrabajadas)
-                    it[horasExtra]      = BigDecimal.valueOf(req.horasExtra)
-                    it[tarifaExtra]     = BigDecimal.valueOf(req.tarifaExtra)
-                    it[tarifaHora]      = BigDecimal.valueOf(req.tarifaHora)
-                    it[pagoTotal]       = BigDecimal.valueOf(totalCalculado)
-                    it[observaciones]   = req.observaciones
-                    it[createdAt]       = now
+                    it[RegistroHoras.id]              = newId
+                    it[RegistroHoras.empleadoUid]     = UUID.fromString(req.empleadoUid)
+                    it[RegistroHoras.fecha]           = java.time.LocalDate.parse(req.fecha)
+                    it[RegistroHoras.horasTrabajadas] = BigDecimal.valueOf(req.horasTrabajadas)
+                    it[RegistroHoras.horasExtra]      = BigDecimal.valueOf(req.horasExtra)
+                    it[RegistroHoras.tarifaExtra]     = BigDecimal.valueOf(req.tarifaExtra)
+                    it[RegistroHoras.tarifaHora]      = BigDecimal.valueOf(req.tarifaHora)
+                    it[RegistroHoras.pagoTotal]       = BigDecimal.valueOf(totalCalculado)
+                    it[RegistroHoras.observaciones]   = req.observaciones
+                    it[RegistroHoras.createdAt]       = now
                 }
             }
             call.respond(HttpStatusCode.Created, mapOf("id" to newId.toString()))

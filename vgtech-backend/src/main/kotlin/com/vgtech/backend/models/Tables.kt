@@ -2,6 +2,7 @@ package com.vgtech.backend.models
 
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
+import org.jetbrains.exposed.sql.javatime.date
 
 // ── Tabla: usuarios ───────────────────────────────────────────────────────────
 object Usuarios : Table("usuarios") {
@@ -61,7 +62,7 @@ object Proyectos : Table("proyectos") {
 object RegistroHoras : Table("registro_horas") {
     val id              = uuid("id").clientDefault { java.util.UUID.randomUUID() }
     val empleadoUid     = uuid("empleado_uid").references(Usuarios.uid)
-    val fecha           = org.jetbrains.exposed.sql.javatime.date("fecha")
+    val fecha           = date("fecha")
     val horasTrabajadas = decimal("horas_trabajadas", 6, 2).default(java.math.BigDecimal.ZERO)
     val horasExtra      = decimal("horas_extra", 6, 2).default(java.math.BigDecimal.ZERO)
     val tarifaExtra     = decimal("tarifa_extra", 4, 2).default(java.math.BigDecimal("2.0"))
