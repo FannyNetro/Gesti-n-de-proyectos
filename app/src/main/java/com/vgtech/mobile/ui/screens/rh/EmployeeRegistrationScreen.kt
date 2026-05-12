@@ -39,14 +39,14 @@ fun EmployeeRegistrationScreen(
     employeeViewModel: EmployeeViewModel,
     onBack: () -> Unit
 ) {
-    var nombreCompleto by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var direccion by remember { mutableStateOf("") }
-    var telefono by remember { mutableStateOf("") }
-    var puesto by remember { mutableStateOf("Consultor") }
-    var sueldo by remember { mutableStateOf("") }
-    var diasVacaciones by remember { mutableStateOf("") }
+    var nombreCompleto by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var email by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var password by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var direccion by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var telefono by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var puesto by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("Consultor") }
+    var sueldo by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var diasVacaciones by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     val tipoTrabajo = remember { mutableStateListOf<String>() }
     var fotoBitmap by remember { mutableStateOf<Bitmap?>(null) }
 

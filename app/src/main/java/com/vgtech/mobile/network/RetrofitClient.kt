@@ -14,9 +14,9 @@ object RetrofitClient {
      * debes cambiar esta IP por la IP de tu propia máquina en tu red Wi-Fi (ej. 192.168.x.x)
      * o usar "http://10.0.2.2:8080/" si estás usando el emulador de Android Studio.
      * 
-     * PC IP de Adrian: 192.168.1.11  |  Puerto Ktor: 8080
+     * PC IP de Adrian: 192.168.0.124  |  Puerto Ktor: 8080
      */
-    private const val BASE_URL = "http://192.168.1.11:8080/"
+    private const val BASE_URL = "http://192.168.0.124:8080/"
 
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
