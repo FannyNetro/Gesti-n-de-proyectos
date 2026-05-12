@@ -382,25 +382,24 @@ private fun EmployeeCard(
                         .background(TealLight),
                     contentAlignment = Alignment.Center
                 ) {
+                    var imageBitmap: androidx.compose.ui.graphics.ImageBitmap? = null
                     if (!employee.fotoBase64.isNullOrBlank()) {
                         try {
                             val imageBytes = android.util.Base64.decode(employee.fotoBase64, android.util.Base64.DEFAULT)
                             val bitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-                            androidx.compose.foundation.Image(
-                                bitmap = bitmap.androidx.compose.ui.graphics.asImageBitmap(),
-                                contentDescription = "Foto de perfil",
-                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            imageBitmap = bitmap?.let { androidx.compose.ui.graphics.asImageBitmap(it) }
                         } catch (e: Exception) {
-                            val initials = employee.nombreCompleto.split(" ").take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()
-                            Text(
-                                text = initials,
-                                color = TealDark,
-                                fontWeight = FontWeight.ExtraBold,
-                                style = MaterialTheme.typography.titleMedium
-                            )
+                            // Ignored, will fallback to initials
                         }
+                    }
+
+                    if (imageBitmap != null) {
+                        androidx.compose.foundation.Image(
+                            bitmap = imageBitmap,
+                            contentDescription = "Foto de perfil",
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     } else {
                         val initials = employee.nombreCompleto.split(" ").take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()
                         Text(
