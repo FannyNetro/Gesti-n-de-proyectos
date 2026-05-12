@@ -21,6 +21,9 @@ object DatabaseFactory {
             validate()
         }
         Database.connect(HikariDataSource(config))
+        transaction {
+            SchemaUtils.createMissingTablesAndColumns(Usuarios)
+        }
         println("✅ Conexión a PostgreSQL establecida — Vg_Tech")
     }
 }
