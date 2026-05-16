@@ -12,9 +12,9 @@ object DatabaseFactory {
     fun init() {
         val config = HikariConfig().apply {
             driverClassName = "org.postgresql.Driver"
-            jdbcUrl         = "jdbc:postgresql://localhost:5432/Vg_Tech?stringtype=unspecified"
+            jdbcUrl         = "jdbc:postgresql://db.cilvugaqpjgvqxxhqyoj.supabase.co:5432/postgres"
             username        = "postgres"
-            password        = "pos123456789"
+            password        = "yRKRZECuGfWO0PXs"
             maximumPoolSize = 10
             isAutoCommit    = false
             transactionIsolation = "TRANSACTION_REPEATABLE_READ"
@@ -28,7 +28,22 @@ object DatabaseFactory {
             } catch (e: Exception) {
                 println("Aviso: No se pudo alterar la columna puesto (puede que no exista aún)")
             }
-            SchemaUtils.createMissingTablesAndColumns(Usuarios, Proyectos, FasesProyecto)
+            SchemaUtils.createMissingTablesAndColumns(
+                Usuarios,
+                UsuarioCategoriasWork,
+                Proyectos,
+                RegistroHoras,
+                SolicitudesVacaciones,
+                ProgresoProyecto,
+                InvitacionesProveedor,
+                Cotizaciones,
+                EvaluacionesDesempeno,
+                FasesPago,
+                TransaccionesProveedor,
+                ResumenCuentaProveedor,
+                MensajesChat,
+                SolicitudesCancelacion
+            )
         }
         println("✅ Conexión a PostgreSQL establecida — Vg_Tech")
     }
