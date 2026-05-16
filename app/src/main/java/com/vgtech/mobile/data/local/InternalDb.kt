@@ -22,6 +22,9 @@ object InternalDb {
     private val _projects = MutableStateFlow<List<Project>>(emptyList())
     val projects: StateFlow<List<Project>> = _projects.asStateFlow()
 
+    private val _projectPhases = MutableStateFlow<List<ProjectPhase>>(emptyList())
+    val projectPhases: StateFlow<List<ProjectPhase>> = _projectPhases.asStateFlow()
+
     private val _cancellationRequests = MutableStateFlow<List<ProjectCancellationRequest>>(emptyList())
     val cancellationRequests: StateFlow<List<ProjectCancellationRequest>> = _cancellationRequests.asStateFlow()
 
@@ -88,10 +91,15 @@ object InternalDb {
             Project(id = "proj-5",   title = "Clínica Privada Norte", description = "Sistema hidráulico y plomería completa. Presupuesto cliente: \$180,000.", consultantUid = "cons-4", providerUid = "prov-4", providerName = "Hidráulica Integral", supervisorUid = "sup-2", progress = 0.20f, status = "En Progreso"),
             Project(id = "proj-6",   title = "Estadio Municipal Reforma", description = "Obra civil integral. Pendiente de asignación de proveedor.", supervisorUid = "sup-uid", progress = 0f, status = "Pendiente")
         )
-        
+
         // ── Seed Transactions & Phases (Migrated from ProviderTxDb) ───────
         val oneDay = 86_400_000L
         val now = System.currentTimeMillis()
+
+        _projectPhases.value = listOf(
+            ProjectPhase(projectId = "proj-1", name = "Fase 1: Demolición", startDate = now - 15 * oneDay, endDate = now - 5 * oneDay, status = "Finalizado", progressPercentage = 100),
+            ProjectPhase(projectId = "proj-1", name = "Fase 2: Estructura", startDate = now - 4 * oneDay, endDate = now + 10 * oneDay, status = "En Progreso", progressPercentage = 50)
+        )
 
         _paymentPhases.value = listOf(
             PaymentPhase(providerId = "prov-uid", projectId = "proj-1", phaseNumber = 1, totalPhases = 2, amountToPay = 60000.0, scheduledDate = now - 15 * oneDay, status = PaymentPhaseStatus.PAGADO, paidDate = now - 15 * oneDay),
@@ -226,6 +234,41 @@ object InternalDb {
 
         if (evaluation != "Rechazado") {
             updateProjectProgress(report.projectId, (modifiedProgress ?: report.progressPercentage) / 100f)
+        }
+    }
+
+    // ── Project Phase Methods ─────────────────────
+    fun addProjectPhase(phase: ProjectPhase) {
+        _projectPhases.value += phase
+    }
+
+    fun updateProjectPhase(phaseId: String, newProgress: Int, imageUrl: String?, observations: String) {
+        _projectPhases.value = _projectPhases.value.map { phase ->
+            if (phase.id == phaseId) {
+                phase.copy(
+                    progressPercentage = newProgress,
+                    imageUrl = imageUrl ?: phase.imageUrl,
+                    observations = observations,
+                    status = if (newProgress >= 100) "Finalizado" else "En Progreso"
+                )
+            } else phase
+        }
+        
+        // Update project global progress
+        val projectId = _projectPhases.value.find { it.id == phaseId }?.projectId
+        if (projectId != null) {
+            val phasesForProject = _projectPhases.value.filter { it.projectId == projectId }
+            if (phasesForProject.isNotEmpty()) {
+                val totalProgress = phasesForProject.map { it.progressPercentage }.average().toFloat() / 100f
+                _projects.value = _projects.value.map { proj ->
+                    if (proj.id == projectId) {
+                        proj.copy(
+                            progress = totalProgress,
+                            status = if (totalProgress >= 1f) "Finalizado" else "En Progreso"
+                        )
+                    } else proj
+                }
+            }
         }
     }
 

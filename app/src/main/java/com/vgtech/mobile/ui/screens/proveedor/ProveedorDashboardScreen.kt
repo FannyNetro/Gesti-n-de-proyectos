@@ -29,6 +29,7 @@ import androidx.compose.ui.window.Dialog
 import com.vgtech.mobile.data.local.InternalDb
 import com.vgtech.mobile.data.model.ChatMessage
 import com.vgtech.mobile.data.model.Project
+import com.vgtech.mobile.data.model.ProjectPhase
 import com.vgtech.mobile.data.model.ProjectProgress
 import com.vgtech.mobile.ui.theme.*
 import java.text.SimpleDateFormat
@@ -39,7 +40,7 @@ import java.util.*
 fun ProveedorDashboardScreen(onLogout: () -> Unit) {
     var selectedTab by remember { mutableStateOf(0) }
     var selectedProjectForDetail by remember { mutableStateOf<Project?>(null) }
-    var showReportDialogFor by remember { mutableStateOf<Project?>(null) }
+    var showReportDialogForPhase by remember { mutableStateOf<com.vgtech.mobile.data.model.ProjectPhase?>(null) }
     
     // For demo purposes, current provider UID
     val currentProviderUid = "prov-uid"
@@ -94,8 +95,7 @@ fun ProveedorDashboardScreen(onLogout: () -> Unit) {
                 when (selectedTab) {
                     0 -> ProyectosActivosView(
                         providerUid = currentProviderUid,
-                        onProjectClick = { selectedProjectForDetail = it },
-                        onReportClick = { showReportDialogFor = it }
+                        onProjectClick = { selectedProjectForDetail = it }
                     )
                     1 -> ProviderChatListScreen(currentProviderUid)
                     2 -> HistorialProyectosView(currentProviderUid)
@@ -109,21 +109,22 @@ fun ProveedorDashboardScreen(onLogout: () -> Unit) {
             ProjectDetailDialog(
                 project = selectedProjectForDetail!!,
                 onDismiss = { selectedProjectForDetail = null },
-                onReportProgress = { 
-                    showReportDialogFor = it
+                onReportProgress = { phase ->
+                    showReportDialogForPhase = phase
                     selectedProjectForDetail = null
                 }
             )
         }
 
-        if (showReportDialogFor != null) {
+        if (showReportDialogForPhase != null) {
             ReportProgressDialog(
-                project = showReportDialogFor!!,
+                phase = showReportDialogForPhase!!,
                 providerUid = currentProviderUid,
-                onDismiss = { showReportDialogFor = null },
-                onSend = { report ->
+                onDismiss = { showReportDialogForPhase = null },
+                onSend = { report: ProjectProgress, newProgress: Int, imageUrl: String?, observations: String ->
                     InternalDb.addProjectProgress(report)
-                    showReportDialogFor = null
+                    InternalDb.updateProjectPhase(showReportDialogForPhase!!.id, newProgress, imageUrl, observations)
+                    showReportDialogForPhase = null
                 }
             )
         }
@@ -265,7 +266,7 @@ fun ProviderChatDetailScreen(project: Project, providerUid: String, onBack: () -
 }
 
 @Composable
-fun ProyectosActivosView(providerUid: String, onProjectClick: (Project) -> Unit, onReportClick: (Project) -> Unit) {
+fun ProyectosActivosView(providerUid: String, onProjectClick: (Project) -> Unit) {
     val projects by InternalDb.projects.collectAsState()
     val providerProjects = remember(projects) { projects.filter { it.providerUid == providerUid && it.status != "Finalizado" } }
 
@@ -288,8 +289,7 @@ fun ProyectosActivosView(providerUid: String, onProjectClick: (Project) -> Unit,
             items(providerProjects) { project ->
                 ProjectCard(
                     project = project,
-                    onClick = { onProjectClick(project) },
-                    onReportClick = { onReportClick(project) }
+                    onClick = { onProjectClick(project) }
                 )
             }
         }
@@ -297,7 +297,7 @@ fun ProyectosActivosView(providerUid: String, onProjectClick: (Project) -> Unit,
 }
 
 @Composable
-fun ProjectCard(project: Project, onClick: () -> Unit, onReportClick: () -> Unit) {
+fun ProjectCard(project: Project, onClick: () -> Unit) {
     val statusColor = when(project.status) {
         "En Progreso" -> Teal
         "Recién Iniciado" -> Color(0xFFFFA000)
@@ -374,27 +374,15 @@ fun ProjectCard(project: Project, onClick: () -> Unit, onReportClick: () -> Unit
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-            
-            Button(
-                onClick = onReportClick,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Navy),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Reportar Avance")
             }
         }
     }
 }
 
 @Composable
-fun ProjectDetailDialog(project: Project, onDismiss: () -> Unit, onReportProgress: (Project) -> Unit) {
-    val reports by InternalDb.projectProgressReports.collectAsState()
-    val projectReports = remember(reports) { reports.filter { it.projectId == project.id }.sortedByDescending { it.date } }
+fun ProjectDetailDialog(project: Project, onDismiss: () -> Unit, onReportProgress: (com.vgtech.mobile.data.model.ProjectPhase) -> Unit) {
+    val phases by InternalDb.projectPhases.collectAsState()
+    val projectPhases = remember(phases) { phases.filter { it.projectId == project.id }.sortedBy { it.startDate } }
     val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
 
     Dialog(onDismissRequest = onDismiss) {
@@ -427,53 +415,14 @@ fun ProjectDetailDialog(project: Project, onDismiss: () -> Unit, onReportProgres
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Delay banner in detail
-                if (project.hasDelays) {
-                    val responsibleLabel = when (project.delayResponsible) {
-                        "Proveedor" -> "Retraso de Proveedor"
-                        "Consultor" -> "Retraso por Consultor"
-                        else -> "Retraso Detectado"
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.Red.copy(alpha = 0.08f))
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(responsibleLabel, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Color.Red)
-                            if (project.delayReason.isNotBlank()) {
-                                Text(project.delayReason, style = MaterialTheme.typography.bodySmall, color = TextMuted)
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                Button(
-                    onClick = { onReportProgress(project) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Teal),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.Add, null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Nuevo Reporte de Avance")
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-                Text("Historial de Avances", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy)
+                Text("Fases del Proyecto", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Navy)
                 Spacer(modifier = Modifier.height(8.dp))
 
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (projectReports.isEmpty()) {
-                        item { Text("No hay reportes registrados para este proyecto.", style = MaterialTheme.typography.bodySmall, color = TextMuted) }
+                    if (projectPhases.isEmpty()) {
+                        item { Text("No hay fases registradas para este proyecto.", style = MaterialTheme.typography.bodySmall, color = TextMuted) }
                     } else {
-                        items(projectReports) { report ->
+                        items(projectPhases) { phase ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -481,19 +430,25 @@ fun ProjectDetailDialog(project: Project, onDismiss: () -> Unit, onReportProgres
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                        Text(report.reportType, style = MaterialTheme.typography.labelLarge, color = Teal, fontWeight = FontWeight.Bold)
-                                        Text(sdf.format(Date(report.date)), style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                                        Text(phase.name, style = MaterialTheme.typography.labelLarge, color = Teal, fontWeight = FontWeight.Bold)
+                                        Text("${phase.progressPercentage}%", style = MaterialTheme.typography.labelMedium, color = Navy, fontWeight = FontWeight.Bold)
                                     }
-                                    Text("Avance: ${report.progressPercentage}%", fontWeight = FontWeight.Bold, color = Navy)
-                                    Text(report.description, style = MaterialTheme.typography.bodySmall)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Entrega: ${sdf.format(Date(phase.endDate))}", style = MaterialTheme.typography.bodySmall, color = TextMuted)
+                                    Text("Estado: ${phase.status}", style = MaterialTheme.typography.bodySmall, color = if(phase.status == "Finalizado") SuccessGreen else WarningAmber)
                                     
-                                    if (report.highlights.isNotBlank()) {
-                                        Text("Puntos Positivos:", style = MaterialTheme.typography.labelSmall, color = SuccessGreen, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
-                                        Text(report.highlights, style = MaterialTheme.typography.bodySmall)
-                                    }
-                                    if (report.issues.isNotBlank()) {
-                                        Text("Obstáculos / Problemas:", style = MaterialTheme.typography.labelSmall, color = Color.Red, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
-                                        Text(report.issues, style = MaterialTheme.typography.bodySmall)
+                                    if (phase.status != "Finalizado") {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Button(
+                                            onClick = { onReportProgress(phase) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Teal),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Reportar Avance")
+                                        }
                                     }
                                 }
                             }
@@ -507,17 +462,18 @@ fun ProjectDetailDialog(project: Project, onDismiss: () -> Unit, onReportProgres
 
 @Composable
 fun ReportProgressDialog(
-    project: Project,
+    phase: com.vgtech.mobile.data.model.ProjectPhase,
     providerUid: String,
     onDismiss: () -> Unit,
-    onSend: (ProjectProgress) -> Unit
+    onSend: (ProjectProgress, Int, String?, String) -> Unit
 ) {
-    var percentage by remember { mutableFloatStateOf(project.progress * 100f) }
-    var description by remember { mutableStateOf(project.description) }
+    var percentage by remember { mutableFloatStateOf(phase.progressPercentage.toFloat()) }
+    var description by remember { mutableStateOf("") }
     var reportType by remember { mutableStateOf("Diario") }
     var highlights by remember { mutableStateOf("") }
     var issues by remember { mutableStateOf("") }
     var delayReason by remember { mutableStateOf("") }
+    var photoBase64 by remember { mutableStateOf<String?>(null) }
     
     val reportTypes = listOf("Diario", "Semanal", "Mensual")
     val scrollState = rememberScrollState()
@@ -529,25 +485,11 @@ fun ReportProgressDialog(
             modifier = Modifier.fillMaxWidth().fillMaxHeight(0.9f)
         ) {
             Column(modifier = Modifier.padding(24.dp).verticalScroll(scrollState)) {
-                Text("Nuevo Reporte de Avance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
-                Text(project.title, style = MaterialTheme.typography.bodySmall, color = Teal)
+                Text("Reportar Avance - ${phase.name}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Navy)
                 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Text("Frecuencia del Reporte", style = MaterialTheme.typography.labelMedium, color = Navy)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    reportTypes.forEach { type ->
-                        FilterChip(
-                            selected = reportType == type,
-                            onClick = { reportType = type },
-                            label = { Text(type) }
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text("Porcentaje de avance: ${percentage.toInt()}%", fontWeight = FontWeight.Bold, color = Navy)
+                Text("Porcentaje de avance de fase: ${percentage.toInt()}%", fontWeight = FontWeight.Bold, color = Navy)
                 Slider(
                     value = percentage,
                     onValueChange = { percentage = it },
@@ -561,39 +503,32 @@ fun ReportProgressDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Actividad Principal / Fase Actual") },
+                    label = { Text("Actividad Principal") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                OutlinedTextField(
-                    value = highlights,
-                    onValueChange = { highlights = it },
-                    label = { Text("Puntos Positivos / Logros") },
-                    placeholder = { Text("¿Qué salió bien?") },
+                // Image upload simulation
+                Button(
+                    onClick = { photoBase64 = "base64_encoded_image_mock" },
                     modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Teal),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Teal),
                     shape = RoundedCornerShape(12.dp)
-                )
+                ) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (photoBase64 != null) "Foto Adjuntada" else "Adjuntar Foto")
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 OutlinedTextField(
                     value = issues,
                     onValueChange = { issues = it },
-                    label = { Text("Obstáculos / Problemas") },
-                    placeholder = { Text("¿Qué salió mal?") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = delayReason,
-                    onValueChange = { delayReason = it },
-                    label = { Text("Motivo de retraso (si aplica)") },
+                    label = { Text("Obstáculos / Problemas (Opcional)") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -607,24 +542,26 @@ fun ReportProgressDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = { 
-                            onSend(ProjectProgress(
-                                projectId = project.id,
-                                projectTitle = project.title,
+                            val report = ProjectProgress(
+                                projectId = phase.projectId,
+                                projectTitle = phase.name,
                                 providerUid = providerUid, 
-                                providerName = "Proveedor General",
+                                providerName = "Proveedor",
                                 progressPercentage = percentage.toInt(),
                                 description = description,
                                 reportType = reportType,
                                 highlights = highlights,
                                 issues = issues,
-                                delayReason = if (delayReason.isBlank()) null else delayReason
-                            ))
+                                delayReason = if (delayReason.isBlank()) null else delayReason,
+                                imageUrl = photoBase64
+                            )
+                            onSend(report, percentage.toInt(), photoBase64, description)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Teal),
-                        enabled = description.isNotBlank(),
+                        enabled = description.isNotBlank() && photoBase64 != null,
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Enviar Reporte")
+                        Text("Enviar Avance")
                     }
                 }
             }

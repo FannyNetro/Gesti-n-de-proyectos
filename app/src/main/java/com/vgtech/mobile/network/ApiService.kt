@@ -136,6 +136,16 @@ interface ApiService {
     @POST("mensajes")
     suspend fun createMensaje(@Body request: CreateMensajeChatDto): Response<Map<String, String>>
 
+    // ── FASES DE PROYECTO ────────────────────────────────────────────────
+    @GET("fases-proyecto")
+    suspend fun getFasesProyecto(@Query("proyectoId") proyectoId: String? = null): Response<List<FaseProyectoDto>>
+
+    @POST("fases-proyecto")
+    suspend fun createFaseProyecto(@Body request: CreateFaseProyectoDto): Response<Map<String, String>>
+
+    @PUT("fases-proyecto/{id}")
+    suspend fun updateFaseProyecto(@Path("id") id: String, @Body request: UpdateFaseProyectoDto): Response<Map<String, String>>
+
     // ── CANCELACIONES ────────────────────────────────────────────────────
     @GET("cancelaciones")
     suspend fun getCancelaciones(): Response<List<CancelacionDto>>

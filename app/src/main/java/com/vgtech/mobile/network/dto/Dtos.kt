@@ -77,6 +77,7 @@ data class ProyectoDto(
     val estado: String = "Pendiente",
     val fechaInicio: Long = 0L,
     val fechaFin: Long? = null,
+    val fechaEntrega: Long? = null,
     val comentarios: String = "",
     val tieneRetrasos: Boolean = false,
     val motivoRetraso: String = "",
@@ -92,7 +93,42 @@ data class CreateProyectoDto(
     val proveedorUid: String? = null,
     val supervisorUid: String? = null,
     val consultorUid: String? = null,
-    val clienteUid: String? = null
+    val clienteUid: String? = null,
+    val fechaEntrega: Long? = null
+)
+
+// ── Fases de Proyecto ─────────────────────────────────────────────────────────
+
+data class FaseProyectoDto(
+    val id: String = "",
+    val proyectoId: String = "",
+    val nombre: String = "",
+    val descripcion: String = "",
+    val fechaInicio: Long = 0L,
+    val fechaEntrega: Long = 0L,
+    val estado: String = "Pendiente",
+    val porcentaje: Int = 0,
+    val fotoBase64: String? = null,
+    val observaciones: String = ""
+)
+
+data class CreateFaseProyectoDto(
+    val proyectoId: String,
+    val nombre: String,
+    val descripcion: String = "",
+    val fechaInicio: Long,
+    val fechaEntrega: Long,
+    val estado: String = "Pendiente"
+)
+
+data class UpdateFaseProyectoDto(
+    val nombre: String? = null,
+    val descripcion: String? = null,
+    val estado: String? = null,
+    val porcentaje: Int? = null,
+    val fotoBase64: String? = null,
+    val observaciones: String? = null,
+    val fechaEntrega: Long? = null
 )
 
 data class UpdateProyectoDto(

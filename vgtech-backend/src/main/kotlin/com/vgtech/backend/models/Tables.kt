@@ -53,8 +53,26 @@ object Proyectos : Table("proyectos") {
     val calificacionProveedor = decimal("calificacion_proveedor", 3, 2).default(java.math.BigDecimal.ZERO)
     val calificacionConsultor = decimal("calificacion_consultor", 3, 2).default(java.math.BigDecimal.ZERO)
     val resultadoEvaluacion   = text("resultado_evaluacion").default("")
+    val fechaEntrega          = timestamp("fecha_entrega").nullable()
     val createdAt             = timestamp("created_at")
     val updatedAt             = timestamp("updated_at")
+    override val primaryKey = PrimaryKey(id)
+}
+
+// ── Tabla: fases_proyecto ──────────────────────────────────────────────────────
+object FasesProyecto : Table("fases_proyecto") {
+    val id            = uuid("id").clientDefault { java.util.UUID.randomUUID() }
+    val proyectoId    = uuid("proyecto_id").references(Proyectos.id)
+    val nombre        = varchar("nombre", 200)
+    val descripcion   = text("descripcion").default("")
+    val fechaInicio   = timestamp("fecha_inicio")
+    val fechaEntrega  = timestamp("fecha_entrega")
+    val estado        = varchar("estado", 30).default("Pendiente")
+    val porcentaje    = short("porcentaje").default(0)
+    val fotoBase64    = text("foto_base64").nullable()
+    val observaciones = text("observaciones").default("")
+    val createdAt     = timestamp("created_at")
+    val updatedAt     = timestamp("updated_at")
     override val primaryKey = PrimaryKey(id)
 }
 

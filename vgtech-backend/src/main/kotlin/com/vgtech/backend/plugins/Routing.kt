@@ -23,5 +23,6 @@ fun Application.configureRouting() {
         transaccionesRoutes()
         mensajesRoutes()
         cancelacionesRoutes()
+        fasesProyectoRoutes()
     }
 }

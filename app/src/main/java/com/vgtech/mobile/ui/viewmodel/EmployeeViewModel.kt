@@ -105,6 +105,7 @@ class EmployeeViewModel(application: Application) : AndroidViewModel(application
                     employee = employee
                 )
                 _registrationState.value = RegistrationState.Success(uid)
+                loadEmployees() // Refresca la lista de empleados inmediatamente después de registrar
             } catch (e: Exception) {
                 _registrationState.value = RegistrationState.Error(
                     e.localizedMessage ?: "Error al registrar empleado"

@@ -129,34 +129,42 @@ fun Route.usuariosRoutes() {
 
         // POST /usuarios — crear nuevo usuario
         post {
-            val req = call.receive<CreateUsuarioRequest>()
-            val newUid = UUID.randomUUID()
-            val now = Instant.now()
-            transaction {
-                Usuarios.insert {
-                    it[uid]            = newUid
-                    it[nombreCompleto] = req.nombreCompleto
-                    it[email]          = req.email
-                    it[passwordHash]   = req.password
-                    it[direccion]      = req.direccion
-                    it[telefono]       = req.telefono
-                    it[puesto]         = req.puesto.uppercase()
-                    it[sueldo]         = BigDecimal.valueOf(req.sueldo)
-                    it[pagoPorHora]    = BigDecimal.valueOf(req.pagoPorHora)
-                    it[diasVacaciones] = BigDecimal.valueOf(req.diasVacaciones)
-                    it[fotoBase64]     = req.fotoBase64
-                    it[fechaRegistro]  = now
-                    it[createdAt]      = now
-                    it[updatedAt]      = now
-                }
-                req.tipoTrabajo.forEach { cat ->
-                    UsuarioCategoriasWork.insert {
-                        it[usuarioUid] = newUid
-                        it[categoria]  = cat
+            try {
+                val req = call.receive<CreateUsuarioRequest>()
+                val newUid = UUID.randomUUID()
+                val now = Instant.now()
+                transaction {
+                    Usuarios.insert {
+                        it[uid]            = newUid
+                        it[nombreCompleto] = req.nombreCompleto
+                        it[email]          = req.email
+                        it[passwordHash]   = req.password
+                        it[direccion]      = req.direccion
+                        it[telefono]       = req.telefono
+                        it[puesto]         = req.puesto.uppercase()
+                        it[sueldo]         = BigDecimal.valueOf(req.sueldo)
+                        it[pagoPorHora]    = BigDecimal.valueOf(req.pagoPorHora)
+                        it[diasVacaciones] = BigDecimal.valueOf(req.diasVacaciones)
+                        it[fotoBase64]     = req.fotoBase64
+                        it[fechaRegistro]  = now
+                        it[createdAt]      = now
+                        it[updatedAt]      = now
+                    }
+                    req.tipoTrabajo.forEach { cat ->
+                        UsuarioCategoriasWork.insert {
+                            it[usuarioUid] = newUid
+                            it[categoria]  = cat
+                        }
                     }
                 }
+                call.respond(HttpStatusCode.Created, mapOf("uid" to newUid.toString()))
+            } catch (e: org.jetbrains.exposed.exceptions.ExposedSQLException) {
+                e.printStackTrace()
+                call.respond(HttpStatusCode.Conflict, mapOf("error" to "El correo ya existe"))
+            } catch (e: Exception) {
+                e.printStackTrace()
+                call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (e.message ?: "Error desconocido")))
             }
-            call.respond(HttpStatusCode.Created, mapOf("uid" to newUid.toString()))
         }
 
         // PUT /usuarios/{uid} — actualizar usuario

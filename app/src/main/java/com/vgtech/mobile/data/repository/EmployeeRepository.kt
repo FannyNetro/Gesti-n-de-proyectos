@@ -54,7 +54,20 @@ class EmployeeRepository {
                 tipoTrabajo    = employee.tipoTrabajo
             )
         )
-        if (!response.isSuccessful) throw Exception("Error al crear empleado: ${response.code()}")
+        if (!response.isSuccessful) {
+            val errorMsg = try {
+                val errorBody = response.errorBody()?.string()
+                if (errorBody != null && errorBody.contains("\"error\"")) {
+                    org.json.JSONObject(errorBody).optString("error", "Error al crear empleado (${response.code()})")
+                } else {
+                    "Error al crear empleado (${response.code()})"
+                }
+            } catch (e: Exception) {
+                "Error al crear empleado: ${response.code()}"
+            }
+            throw Exception(errorMsg)
+        }
+
         return response.body()?.get("uid") ?: throw Exception("Respuesta vacía")
     }
 

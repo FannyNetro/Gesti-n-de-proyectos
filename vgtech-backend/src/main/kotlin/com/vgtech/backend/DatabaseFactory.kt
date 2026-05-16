@@ -12,7 +12,7 @@ object DatabaseFactory {
     fun init() {
         val config = HikariConfig().apply {
             driverClassName = "org.postgresql.Driver"
-            jdbcUrl         = "jdbc:postgresql://localhost:5432/Vg_Tech"
+            jdbcUrl         = "jdbc:postgresql://localhost:5432/Vg_Tech?stringtype=unspecified"
             username        = "postgres"
             password        = "pos123456789"
             maximumPoolSize = 10
@@ -22,7 +22,13 @@ object DatabaseFactory {
         }
         Database.connect(HikariDataSource(config))
         transaction {
-            SchemaUtils.createMissingTablesAndColumns(Usuarios)
+            try {
+                // Forzar que la columna puesto sea VARCHAR para evitar conflictos de tipo rol_usuario
+                exec("ALTER TABLE usuarios ALTER COLUMN puesto TYPE VARCHAR(50) USING puesto::VARCHAR;")
+            } catch (e: Exception) {
+                println("Aviso: No se pudo alterar la columna puesto (puede que no exista aún)")
+            }
+            SchemaUtils.createMissingTablesAndColumns(Usuarios, Proyectos, FasesProyecto)
         }
         println("✅ Conexión a PostgreSQL establecida — Vg_Tech")
     }
